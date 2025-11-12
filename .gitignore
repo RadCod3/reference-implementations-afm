@@ -13,3 +13,5 @@ Config.toml
 *.env
 .vscode/
 
+# Temp
+wd/
