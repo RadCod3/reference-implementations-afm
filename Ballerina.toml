@@ -7,91 +7,56 @@ distribution = "2201.12.10"
 [build-options]
 observabilityIncluded = true
 
+# Lightweight JSON Schema validator (Apache 2.0 license)
 [[platform.java21.dependency]]
-groupId = "com.networknt"
-artifactId = "json-schema-validator"
-version = "1.5.6"
+groupId = "com.github.erosb"
+artifactId = "everit-json-schema"
+version = "1.14.4"
 
-# transitive dependency of com.networknt:json-schema-validator:1.5.6
+# transitive dependency of com.github.erosb:everit-json-schema:1.14.4
 [[platform.java21.dependency]]
-groupId = "com.ethlo.time"
-artifactId = "itu"
-version = "1.10.3"
+groupId = "org.json"
+artifactId = "json"
+version = "20231013"
 
-# transitive dependency of com.networknt:json-schema-validator:1.5.6
+# transitive dependency of com.github.erosb:everit-json-schema:1.14.4
 [[platform.java21.dependency]]
-groupId = "com.fasterxml.jackson.core"
-artifactId = "jackson-databind"
-version = "2.18.1"
+groupId = "commons-validator"
+artifactId = "commons-validator"
+version = "1.7"
 
-# transitive dependency of com.fasterxml.jackson.core:jackson-databind:2.18.1
+# transitive dependency of commons-validator:commons-validator:1.7
 [[platform.java21.dependency]]
-groupId = "com.fasterxml.jackson.core"
-artifactId = "jackson-annotations"
-version = "2.18.1"
+groupId = "commons-digester"
+artifactId = "commons-digester"
+version = "2.1"
 
-# transitive dependency of com.fasterxml.jackson.core:jackson-databind:2.18.1
+# transitive dependency of commons-validator:commons-validator:1.7
 [[platform.java21.dependency]]
-groupId = "com.fasterxml.jackson.core"
-artifactId = "jackson-core"
-version = "2.18.1"
+groupId = "commons-logging"
+artifactId = "commons-logging"
+version = "1.2"
 
-# transitive dependency of com.networknt:json-schema-validator:1.5.6
+# transitive dependency of commons-validator:commons-validator:1.7
 [[platform.java21.dependency]]
-groupId = "com.fasterxml.jackson.dataformat"
-artifactId = "jackson-dataformat-yaml"
-version = "2.18.1"
+groupId = "commons-collections"
+artifactId = "commons-collections"
+version = "3.2.2"
 
-# transitive dependency of com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.1
+# transitive dependency of com.github.erosb:everit-json-schema:1.14.4
 [[platform.java21.dependency]]
-groupId = "org.yaml"
-artifactId = "snakeyaml"
-version = "2.3"
+groupId = "com.damnhandy"
+artifactId = "handy-uri-templates"
+version = "2.1.8"
 
-# transitive dependency of com.networknt:json-schema-validator:1.5.6
+# transitive dependency of com.damnhandy:handy-uri-templates:2.1.8
 [[platform.java21.dependency]]
-groupId = "org.jruby.joni"
-artifactId = "joni"
-version = "2.2.1"
+groupId = "joda-time"
+artifactId = "joda-time"
+version = "2.10.2"
 
-# transitive dependency of org.jruby.joni:joni:2.2.1
+# transitive dependency of com.github.erosb:everit-json-schema:1.14.4
 [[platform.java21.dependency]]
-groupId = "org.jruby.jcodings"
-artifactId = "jcodings"
-version = "1.0.58"
-
-# transitive dependency of com.networknt:json-schema-validator:1.5.6
-[[platform.java21.dependency]]
-groupId = "org.graalvm.js"
-artifactId = "js"
-version = "21.3.10"
-
-# transitive dependency of org.graalvm.js:js:21.3.10
-[[platform.java21.dependency]]
-groupId = "org.graalvm.regex"
-artifactId = "regex"
-version = "21.3.10"
-
-# transitive dependency of org.graalvm.js:js:21.3.10
-[[platform.java21.dependency]]
-groupId = "org.graalvm.truffle"
-artifactId = "truffle-api"
-version = "21.3.10"
-
-# transitive dependency of org.graalvm.js:js:21.3.10
-[[platform.java21.dependency]]
-groupId = "com.ibm.icu"
-artifactId = "icu4j"
-version = "71.1"
-
-# transitive dependency of com.networknt:json-schema-validator:1.5.6
-[[platform.java21.dependency]]
-groupId = "org.graalvm.sdk"
-artifactId = "graal-sdk"
-version = "21.3.10"
-
-# transitive dependency of com.networknt:json-schema-validator:1.5.6
-[[platform.java21.dependency]]
-groupId = "org.slf4j"
-artifactId = "slf4j-api"
-version = "2.0.16"
+groupId = "com.google.re2j"
+artifactId = "re2j"
+version = "1.6"

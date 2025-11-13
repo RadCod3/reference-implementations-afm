@@ -1,4 +1,4 @@
-import afm_ballerina.networknt.validator;
+import afm_ballerina.everit.validator;
 
 import ballerina/ai;
 import ballerina/data.yaml;
@@ -220,11 +220,16 @@ function transformToJsonObjectSchema(Parameter[] params) returns map<json> & rea
         }
     }
     
-    return {
+    map<json> schema = {
         "type": "object",
-        "properties": properties.cloneReadOnly(),
-        "required": requiredFields.length() > 0 ? requiredFields.cloneReadOnly() : ()
+        "properties": properties.cloneReadOnly()
     };
+    
+    if requiredFields.length() > 0 {
+        schema["required"] = requiredFields.cloneReadOnly();
+    }
+    
+    return schema.cloneReadOnly();
 }
 
 function runAgent(ai:Agent agent, map<json> inputSchema, map<json> outputSchema, json payload) returns json|InputError|AgentError {
@@ -269,27 +274,23 @@ function runAgent(ai:Agent agent, map<json> inputSchema, map<json> outputSchema,
 }
 
 isolated function validateJsonSchema(map<json> jsonSchemaVal, json sampleJson) returns error? {
-    validator:VersionFlag versionFlag = validator:VersionFlag_getV202012();
-    validator:JsonSchema jsonSchema = validator:JsonSchemaFactory_getInstance(versionFlag)
-            .getSchema10(jsonSchemaVal.toJsonString());
-    validator:Set|error validationResults = trap jsonSchema.validate11(sampleJson.toJsonString(), validator:InputFormat_getJSON());
-
-
-    if validationResults is error {
-        return error("Unexpected error occurred while validating the JSON value: " + validationResults.message());
+    // Create JSONObject from schema
+    validator:JSONObject schemaObject = validator:newJSONObject7(jsonSchemaVal.toJsonString());
+    
+    // Build the schema using SchemaLoader
+    validator:SchemaLoaderBuilder builder = validator:newSchemaLoaderBuilder1();
+    validator:SchemaLoader schemaLoader = builder.schemaJson(schemaObject).build();
+    validator:Schema schema = schemaLoader.load().build();
+    
+    // Create JSONObject from the JSON to validate
+    validator:JSONObject jsonObject = validator:newJSONObject7(sampleJson.toJsonString());
+    
+    // Validate - throws ValidationException if invalid
+    error? validationResult = trap schema.validate(jsonObject);
+    
+    if validationResult is error {
+        return error("JSON validation failed: " + validationResult.message());
     }
-
-
-    if validationResults.size() == 0 {
-        return ();
-    }
-
-
-    string stringResult = "";
-    validator:Iterator iterator = validationResults.iterator();
-    while iterator.hasNext() {
-        validator:Object next = iterator.next();
-        stringResult += next.toString() + "\n";
-    }
-    return error("Error(s) occurred while validating the JSON value: " + stringResult);    
+    
+    return ();
 }
