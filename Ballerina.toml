@@ -1,0 +1,97 @@
+[package]
+org = "wso2"
+name = "afm_ballerina"
+version = "0.1.0"
+distribution = "2201.12.10"
+
+[build-options]
+observabilityIncluded = true
+
+[[platform.java21.dependency]]
+groupId = "com.networknt"
+artifactId = "json-schema-validator"
+version = "1.5.6"
+
+# transitive dependency of com.networknt:json-schema-validator:1.5.6
+[[platform.java21.dependency]]
+groupId = "com.ethlo.time"
+artifactId = "itu"
+version = "1.10.3"
+
+# transitive dependency of com.networknt:json-schema-validator:1.5.6
+[[platform.java21.dependency]]
+groupId = "com.fasterxml.jackson.core"
+artifactId = "jackson-databind"
+version = "2.18.1"
+
+# transitive dependency of com.fasterxml.jackson.core:jackson-databind:2.18.1
+[[platform.java21.dependency]]
+groupId = "com.fasterxml.jackson.core"
+artifactId = "jackson-annotations"
+version = "2.18.1"
+
+# transitive dependency of com.fasterxml.jackson.core:jackson-databind:2.18.1
+[[platform.java21.dependency]]
+groupId = "com.fasterxml.jackson.core"
+artifactId = "jackson-core"
+version = "2.18.1"
+
+# transitive dependency of com.networknt:json-schema-validator:1.5.6
+[[platform.java21.dependency]]
+groupId = "com.fasterxml.jackson.dataformat"
+artifactId = "jackson-dataformat-yaml"
+version = "2.18.1"
+
+# transitive dependency of com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.1
+[[platform.java21.dependency]]
+groupId = "org.yaml"
+artifactId = "snakeyaml"
+version = "2.3"
+
+# transitive dependency of com.networknt:json-schema-validator:1.5.6
+[[platform.java21.dependency]]
+groupId = "org.jruby.joni"
+artifactId = "joni"
+version = "2.2.1"
+
+# transitive dependency of org.jruby.joni:joni:2.2.1
+[[platform.java21.dependency]]
+groupId = "org.jruby.jcodings"
+artifactId = "jcodings"
+version = "1.0.58"
+
+# transitive dependency of com.networknt:json-schema-validator:1.5.6
+[[platform.java21.dependency]]
+groupId = "org.graalvm.js"
+artifactId = "js"
+version = "21.3.10"
+
+# transitive dependency of org.graalvm.js:js:21.3.10
+[[platform.java21.dependency]]
+groupId = "org.graalvm.regex"
+artifactId = "regex"
+version = "21.3.10"
+
+# transitive dependency of org.graalvm.js:js:21.3.10
+[[platform.java21.dependency]]
+groupId = "org.graalvm.truffle"
+artifactId = "truffle-api"
+version = "21.3.10"
+
+# transitive dependency of org.graalvm.js:js:21.3.10
+[[platform.java21.dependency]]
+groupId = "com.ibm.icu"
+artifactId = "icu4j"
+version = "71.1"
+
+# transitive dependency of com.networknt:json-schema-validator:1.5.6
+[[platform.java21.dependency]]
+groupId = "org.graalvm.sdk"
+artifactId = "graal-sdk"
+version = "21.3.10"
+
+# transitive dependency of com.networknt:json-schema-validator:1.5.6
+[[platform.java21.dependency]]
+groupId = "org.slf4j"
+artifactId = "slf4j-api"
+version = "2.0.16"
