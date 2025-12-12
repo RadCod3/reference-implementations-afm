@@ -50,14 +50,15 @@
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <h1>AFM Agent Chat</h1>
-            <p class="subtitle">Powered by Ballerina</p>
+            <h1>{{AGENT_NAME}}</h1>
+            <p class="subtitle">{{AGENT_DESCRIPTION}}</p>
+            <p class="subtitle" style="font-size: 12px; margin-top: 4px;">Powered by Ballerina</p>
         </div>
         <div class="chat-messages" id="chatMessages">
             <div class="message agent">
                 <div class="message-wrapper">
                     <div class="message-label">Agent</div>
-                    <div class="message-content">Hello! I'm your AFM agent. How can I help you today?</div>
+                    <div class="message-content">Hello! How can I help you today?</div>
                 </div>
             </div>
         </div>
@@ -75,7 +76,8 @@ const messageInput=document.getElementById('messageInput');
 const sendBtn=document.getElementById('sendBtn');
 const chatPath='{{CHAT_PATH}}';
 function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
-function formatResponse(r){if(typeof r==='string')return escapeHtml(r);if(typeof r==='object'){try{return'<pre>'+escapeHtml(JSON.stringify(r,null,2))+'</pre>';}catch(e){return escapeHtml(String(r));}}return escapeHtml(String(r));}
+function parseMarkdown(md){let html=escapeHtml(md);html=html.replace(/```([\s\S]*?)```/g,(m,code)=>'<pre style="background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto;margin:8px 0;"><code>'+code.trim()+'</code></pre>');html=html.replace(/`([^`]+)`/g,'<code style="background:#f5f5f5;padding:2px 6px;border-radius:3px;font-family:monospace;">$1</code>');html=html.replace(/^### (.*$)/gm,'<h3 style="font-size:16px;font-weight:600;margin:12px 0 6px 0;">$1</h3>');html=html.replace(/^## (.*$)/gm,'<h2 style="font-size:18px;font-weight:600;margin:12px 0 6px 0;">$1</h2>');html=html.replace(/^# (.*$)/gm,'<h1 style="font-size:20px;font-weight:600;margin:12px 0 6px 0;">$1</h1>');html=html.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');html=html.replace(/\*([^*]+)\*/g,'<em>$1</em>');html=html.replace(/^- (.+)$/gm,'<li style="margin-left:20px;">$1</li>');html=html.replace(/^(\d+)\. (.+)$/gm,'<li style="margin-left:20px;list-style-type:decimal;">$2</li>');html=html.replace(/\n/g,'<br>');return html;}
+function formatResponse(r){if(typeof r==='string')return parseMarkdown(r);if(typeof r==='object'){try{return'<pre style="background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto;margin:8px 0;"><code>'+escapeHtml(JSON.stringify(r,null,2))+'</code></pre>';}catch(e){return escapeHtml(String(r));}}return escapeHtml(String(r));}
 function addMessage(content,isUser){const div=document.createElement('div');div.className='message '+(isUser?'user':'agent');const fc=isUser?escapeHtml(content):formatResponse(content);div.innerHTML='<div class="message-wrapper"><div class="message-label">'+(isUser?'You':'Agent')+'</div><div class="message-content">'+fc+'</div></div>';chatMessages.appendChild(div);chatMessages.scrollTop=chatMessages.scrollHeight;}
 function showTypingIndicator(){const div=document.createElement('div');div.className='message agent';div.id='typingIndicator';div.innerHTML='<div class="message-wrapper"><div class="message-label">Agent</div><div class="typing-indicator show"><span></span><span></span><span></span></div></div>';chatMessages.appendChild(div);chatMessages.scrollTop=chatMessages.scrollHeight;}
 function hideTypingIndicator(){const t=document.getElementById('typingIndicator');if(t)t.remove();}

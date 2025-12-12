@@ -56,7 +56,7 @@ public function main(string filePath) returns error? {
         check attachChatService(ln, agent, webChatInterface, httpExposure);
         log:printInfo(string `Attached web chat interface at path: ${httpExposure.path}`);
 
-        check attachWebChatUIService(ln, httpExposure.path);
+        check attachWebChatUIService(ln, httpExposure.path, metadata);
         log:printInfo("Attached web chat UI at path: /");
     }
 

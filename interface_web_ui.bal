@@ -16,10 +16,9 @@
 
 import ballerina/http;
 import ballerina/io;
-import ballerina/lang.regexp;
 
-function attachWebChatUIService(http:Listener httpListener, string chatPath) returns error? {
-    http:Service webUIService = check new WebUIService(chatPath);
+function attachWebChatUIService(http:Listener httpListener, string chatPath, AgentMetadata metadata) returns error? {
+    http:Service webUIService = check new WebUIService(chatPath, metadata);
     return httpListener.attach(webUIService, "/");
 }
 
@@ -28,13 +27,19 @@ service class WebUIService {
 
     private final string htmlContent;
 
-    function init(string chatPath) returns error? {
+    function init(string chatPath, AgentMetadata metadata) returns error? {
         string template = check io:fileReadString("resources/chat-ui.html");
 
+        string agentName = metadata.name ?: "AFM Agent Chat";
+        string agentDescription = metadata.description ?: "AI Assistant";
         string escapedPath = escapeForJavaScript(chatPath);
 
-        regexp:RegExp pattern = re `\{\{CHAT_PATH\}\}`;
-        self.htmlContent = pattern.replaceAll(template, escapedPath);
+        string result = template;
+        result = re `\{\{AGENT_NAME\}\}`.replaceAll(result, escapeHtml(agentName));
+        result = re `\{\{AGENT_DESCRIPTION\}\}`.replaceAll(result, escapeHtml(agentDescription));
+        result = re `\{\{CHAT_PATH\}\}`.replaceAll(result, escapedPath);
+
+        self.htmlContent = result;
     }
 
     resource function get .() returns http:Response {
@@ -52,6 +57,16 @@ service class WebUIService {
         response.setPayload(self.htmlContent);
         return response;
     }
+}
+
+function escapeHtml(string input) returns string {
+    string escaped = input;
+    escaped = re `&`.replaceAll(escaped, "&amp;");
+    escaped = re `<`.replaceAll(escaped, "&lt;");
+    escaped = re `>`.replaceAll(escaped, "&gt;");
+    escaped = re `"`.replaceAll(escaped, "&quot;");
+    escaped = re `'`.replaceAll(escaped, "&#x27;");
+    return escaped;
 }
 
 function escapeForJavaScript(string input) returns string {
