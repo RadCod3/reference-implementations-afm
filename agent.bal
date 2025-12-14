@@ -119,7 +119,9 @@ function getModel(Model? model) returns ai:ModelProvider|error {
     return error(string `Model provider: ${<string>provider} not yet supported`);
 }
 
-function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), map<json>? outputSchema = ()) 
+const DEFAULT_SESSION_ID = "sessionId";
+
+function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), map<json>? outputSchema = (), string sessionId = DEFAULT_SESSION_ID) 
         returns json|InputError|AgentError {
     error? validateJsonSchemaResult = validateJsonSchema(inputSchema, payload);
     if validateJsonSchemaResult is error {
@@ -154,7 +156,7 @@ function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), map
             effectiveOutputSchema.toJsonString()}` : ""}
 
         Respond only with the value enclosed between ${"```json"} and ${"```"}.
-        `);
+        `, sessionId);
 
     if run is ai:Error {
         log:printError("Agent run failed", 'error = run);
@@ -169,7 +171,7 @@ function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), map
         responseJsonStr = run.substring(lastJsonStart + 7, lastJsonEnd).trim();
     }
 
-    json|error responseJson = responseJsonStr.fromJsonString();
+    json|error responseJson = responseJsonStr.toJsonString().fromJsonString();
 
     if responseJson is error {
         log:printError("Failed to parse agent response JSON", 'error = responseJson);

@@ -18,9 +18,35 @@ import ballerina/ai;
 import ballerina/http;
 
 function attachChatService(http:Listener httpListener, ai:Agent agent, 
-                           WebChatInterface webChatInterface, HTTPExposure httpExposure) returns error? {
+                           WebChatInterface webChatInterface, HTTPExposure httpExposure) returns ai:Listener|error? {
+    Signature signature = webChatInterface.signature;
+    if signature.input.'type == "string" && 
+            signature.output.'type == "string" && 
+            httpExposure.path == "/chat" {
+        AiChatService aiChatService = check new (agent);
+        ai:Listener aiListener = check new (httpListener);
+        check aiListener.attach(aiChatService, ""); // /chat comes from the resource
+        return aiListener;
+    }
+    
     http:Service httpService = check new ChatHttpService(agent, webChatInterface);
     return httpListener.attach(httpService, httpExposure.path);
+}
+
+service class AiChatService {
+    *ai:ChatService;
+
+    private final ai:Agent agent;
+
+    function init(ai:Agent agent) returns error? {
+        self.agent = agent;
+    }
+
+    resource function post chat(@http:Payload ai:ChatReqMessage request) 
+            returns ai:ChatRespMessage|error {
+        string runAgentResult = check runAgent(self.agent, request.message, sessionId = request.sessionId).ensureType();
+        return {message: runAgentResult};
+    }
 }
 
 service class ChatHttpService {

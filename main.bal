@@ -44,6 +44,7 @@ public function main(string filePath) returns error? {
 
     // Start all service-based interfaces first (non-blocking)
     http:Listener? httpListener = ();
+    ai:Listener? aiListener = ();
     websub:Listener? websubListener = ();
 
     if webChatInterface is WebChatInterface {
@@ -51,11 +52,13 @@ public function main(string filePath) returns error? {
 
         http:Listener ln = check new (port);
         httpListener = ln;
-        check attachChatService(ln, agent, webChatInterface, httpExposure);
+        aiListener = check attachChatService(ln, agent, webChatInterface, httpExposure);
         log:printInfo(string `Attached web chat interface at path: ${httpExposure.path}`);
 
-        check attachWebChatUIService(ln, httpExposure.path, metadata);
-        log:printInfo("Attached web chat UI at path: /");
+        if aiListener is ai:Listener {
+            check attachWebChatUIService(ln, httpExposure.path, metadata);
+            log:printInfo("Attached web chat UI at path: /chat-ui");
+        }
     }
 
     if webhookInterface is WebhookInterface {
@@ -72,7 +75,15 @@ public function main(string filePath) returns error? {
         check websubListener.start();
         runtime:registerListener(websubListener);
         log:printInfo(string `WebSub server started on port ${port}`);
-    } if httpListener is http:Listener {
+    } 
+
+    if aiListener is ai:Listener {
+        check aiListener.start();
+        runtime:registerListener(aiListener);
+        log:printInfo(string `AI listener started on port ${port}`);
+    }
+    
+    if httpListener is http:Listener && aiListener is () && websubListener is () {
         check httpListener.start();
         runtime:registerListener(httpListener);
         log:printInfo(string `HTTP server started on port ${port}`);
