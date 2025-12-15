@@ -16,38 +16,36 @@
 
 import ballerina/ai;
 import ballerina/http;
+import ballerina/log;
 
 function attachChatService(http:Listener httpListener, ai:Agent agent, 
-                           WebChatInterface webChatInterface, HTTPExposure httpExposure) returns ai:Listener|error? {
-    Signature signature = webChatInterface.signature;
-    if signature.input.'type == "string" && 
-            signature.output.'type == "string" && 
-            httpExposure.path == "/chat" {
-        AiChatService aiChatService = check new (agent);
-        ai:Listener aiListener = check new (httpListener);
-        check aiListener.attach(aiChatService, ""); // /chat comes from the resource
-        return aiListener;
+                           WebChatInterface webChatInterface, HTTPExposure httpExposure,
+                           boolean isStringInputOutput) returns error? {
+    if isStringInputOutput {
+        StringChatHttpService stringChatService = check new (agent);
+        return httpListener.attach(stringChatService, httpExposure.path);
     }
     
+    log:printWarn("Non-string input and/or output types used with the 'webchat' interface type");
     http:Service httpService = check new ChatHttpService(agent, webChatInterface);
     return httpListener.attach(httpService, httpExposure.path);
 }
 
-service class AiChatService {
-    *ai:ChatService;
+// service class AiChatService {
+//     *ai:ChatService;
 
-    private final ai:Agent agent;
+//     private final ai:Agent agent;
 
-    function init(ai:Agent agent) returns error? {
-        self.agent = agent;
-    }
+//     function init(ai:Agent agent) returns error? {
+//         self.agent = agent;
+//     }
 
-    resource function post chat(@http:Payload ai:ChatReqMessage request) 
-            returns ai:ChatRespMessage|error {
-        string runAgentResult = check runAgent(self.agent, request.message, sessionId = request.sessionId).ensureType();
-        return {message: runAgentResult};
-    }
-}
+//     resource function post chat(@http:Payload ai:ChatReqMessage request) 
+//             returns ai:ChatRespMessage|error {
+//         string runAgentResult = check runAgent(self.agent, request.message, sessionId = request.sessionId).ensureType();
+//         return {message: runAgentResult};
+//     }
+// }
 
 service class ChatHttpService {
     *http:Service;
@@ -74,3 +72,23 @@ service class ChatHttpService {
         return <http:InternalServerError> {body: runAgentResult.message()};
     }
 }
+
+service class StringChatHttpService {
+    *http:Service;
+
+    private final ai:Agent agent;
+
+    function init(ai:Agent agent) returns error? {
+        self.agent = agent;
+    }
+
+    resource function post .(@http:Payload string payload, 
+                             @http:Header {name: "X-Session-Id"} string sessionId = DEFAULT_SESSION_ID) returns string|http:InternalServerError {
+        string|error runAgentResult = runAgent(self.agent, payload, sessionId = sessionId).ensureType();
+        if runAgentResult is error {
+            return <http:InternalServerError> {body: runAgentResult.message()};
+        }
+        return runAgentResult;
+    }
+}
+
