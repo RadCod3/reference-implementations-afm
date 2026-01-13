@@ -1,17 +1,24 @@
-FROM ballerina/ballerina:2201.12.10
+# Build stage (discarded after build)
+FROM ballerina/ballerina:2201.12.10 AS builder
+
+USER root
 
 WORKDIR /app
 
-# Copy the Ballerina project files
 COPY Ballerina.toml .
 COPY *.bal .
 COPY modules ./modules
 
-# Build the Ballerina application (will generate Dependencies.toml)
 RUN bal build
 
-# Copy resources after build (so they're available at runtime)
-COPY resources ./resources
+# Runtime stage
+FROM ballerina/ballerina:2201.12.10
 
-# Set the entrypoint to run the Ballerina JAR
+WORKDIR /app
+
+COPY --from=builder --chown=10014:0 /app/target/bin/afm_ballerina.jar ./target/bin/
+COPY --chown=10014:0 resources ./resources
+
+USER 10014
+
 ENTRYPOINT ["bal", "run", "target/bin/afm_ballerina.jar"]
