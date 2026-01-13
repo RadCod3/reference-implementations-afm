@@ -22,14 +22,27 @@ import ballerina/lang.runtime;
 import ballerina/websub;
 
 configurable int port = 8085;
+configurable string? afmFilePath = ();
 
 const FRONTMATTER_DELIMITER = "---";
 
 type InputError distinct error;
 type AgentError distinct error;
 
-public function main(string filePath) returns error? {
-    string content = check io:fileReadString(filePath);
+public function main(string? filePath = ()) returns error? {
+    string fileToUse;
+    if filePath is () {
+        if afmFilePath is () {
+            return error("AFM file path must be provided either as a command-line " +
+                         "argument or through configuration");
+        }
+        fileToUse = <string> afmFilePath;
+    } else {
+        fileToUse = filePath;
+    }
+
+
+    string content = check io:fileReadString(fileToUse);
 
     AFMRecord afm = check parseAfm(content);
 
