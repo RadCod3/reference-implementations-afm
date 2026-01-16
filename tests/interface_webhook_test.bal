@@ -244,16 +244,8 @@ function testWebhookEndToEnd() returns error? {
     test:assertEquals(capturedPrompts.length(), 2, "Should have captured 2 prompts");
 
     // Verify exact prompt content after template evaluation
-    string expectedPrompt1 = string `"[order.created] Process the following order event: {\"event\":\"order.created\", \"orderId\":\"12345\", \"amount\":99.99, \"customer\":\"john@example.com\"}"
-        
-        
-
-        Respond only with the value enclosed between ${"```"} and ${"```"}.`;
-    string expectedPrompt2 = string `"[payment.confirmed] Process the following order event: {\"event\":\"payment.confirmed\", \"orderId\":\"12345\", \"amount\":99.99}"
-        
-        
-
-        Respond only with the value enclosed between ${"```"} and ${"```"}.`;
+    string expectedPrompt1 = "\"[order.created] Process the following order event: {\\\"event\\\":\\\"order.created\\\", \\\"orderId\\\":\\\"12345\\\", \\\"amount\\\":99.99, \\\"customer\\\":\\\"john@example.com\\\"}\"";
+    string expectedPrompt2 = "\"[payment.confirmed] Process the following order event: {\\\"event\\\":\\\"payment.confirmed\\\", \\\"orderId\\\":\\\"12345\\\", \\\"amount\\\":99.99}\"";
 
     test:assertEquals(capturedPrompts[0], expectedPrompt1,
         "First prompt should match expected template evaluation");
