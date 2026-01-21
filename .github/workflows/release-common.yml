@@ -93,22 +93,13 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "release-$IMPLEMENTATION-$VERSION"
 
-      - name: Substitute placeholders in docs
-        env:
-          IMPLEMENTATION: ${{ inputs.implementation }}
-          OWNER: ${{ github.repository_owner }}
-        run: |
-          # GHCR lowercases the owner
-          OWNER_LOWER=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-          sed -i "s/__OWNER__/$OWNER_LOWER/g" "$IMPLEMENTATION/DOCKER.md"
-
       - name: Set release version and commit
         env:
           IMPLEMENTATION: ${{ inputs.implementation }}
           VERSION: ${{ inputs.version }}
         run: |
           echo "$VERSION" > "$IMPLEMENTATION/VERSION"
-          git add "$IMPLEMENTATION/VERSION" "$IMPLEMENTATION/DOCKER.md"
+          git add "$IMPLEMENTATION/VERSION"
           git commit -m "Release $IMPLEMENTATION v$VERSION"
 
       - name: Set up Docker Buildx
@@ -152,7 +143,6 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=AFM ${{ inputs.implementation }}
             org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/${{ inputs.branch }}/${{ inputs.implementation }}/DOCKER.md
           annotations: |
             index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
             index:org.opencontainers.image.licenses=Apache-2.0

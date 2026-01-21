@@ -1,4 +1,4 @@
-// Copyright (c) 2024, WSO2 LLC. (https://www.wso2.com).
+// Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
 //
 // WSO2 LLC. licenses this file to you under the Apache License,
 // Version 2.0 (the "License"); you may not use this file except
@@ -30,22 +30,6 @@ function attachChatService(http:Listener httpListener, ai:Agent agent,
     http:Service httpService = check new ChatHttpService(agent, webChatInterface);
     return httpListener.attach(httpService, httpExposure.path);
 }
-
-// service class AiChatService {
-//     *ai:ChatService;
-
-//     private final ai:Agent agent;
-
-//     function init(ai:Agent agent) returns error? {
-//         self.agent = agent;
-//     }
-
-//     resource function post chat(@http:Payload ai:ChatReqMessage request) 
-//             returns ai:ChatRespMessage|error {
-//         string runAgentResult = check runAgent(self.agent, request.message, sessionId = request.sessionId).ensureType();
-//         return {message: runAgentResult};
-//     }
-// }
 
 service class ChatHttpService {
     *http:Service;
@@ -83,7 +67,8 @@ service class StringChatHttpService {
     }
 
     resource function post .(@http:Payload string payload, 
-                             @http:Header {name: "X-Session-Id"} string sessionId = DEFAULT_SESSION_ID) returns string|http:InternalServerError {
+                             @http:Header {name: "X-Session-Id"} string sessionId = DEFAULT_SESSION_ID) 
+                                returns string|http:InternalServerError {
         string|error runAgentResult = runAgent(self.agent, payload, sessionId = sessionId).ensureType();
         if runAgentResult is error {
             return <http:InternalServerError> {body: runAgentResult.message()};
