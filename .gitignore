@@ -13,14 +13,5 @@ wd/
 **/target/
 **/generated/
 
-# Ballerina config (contains local dev values)
+# Ballerina config
 **/Config.toml
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-
-# Node
-node_modules/
