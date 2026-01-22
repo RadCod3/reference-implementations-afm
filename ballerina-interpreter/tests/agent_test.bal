@@ -14,6 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import ballerina/http;
+import ballerina/io;
+import ballerina/lang.runtime;
 import ballerina/test;
 
 @test:Config
@@ -132,6 +135,39 @@ function testValidateJsonSchemaNestedObjectValid() returns error? {
     json sample = {"user": {"name": "Bob"}};
     error? result = validateJsonSchema(schema, sample);
     test:assertTrue(result is ());
+}
+
+@test:Config
+function testValidateJsonSchemaArrayValid() returns error? {
+    map<json> schema = {
+        "type": "array",
+        "items": {"type": "string"}
+    };
+    json sample = ["apple", "banana", "cherry"];
+    error? result = validateJsonSchema(schema, sample);
+    test:assertTrue(result is ());
+}
+
+@test:Config
+function testValidateJsonSchemaArrayInvalid() returns error? {
+    map<json> schema = {
+        "type": "array",
+        "items": {"type": "string"}
+    };
+    json sample = ["apple", 123, "cherry"]; // 123 is not a string
+    error? result = validateJsonSchema(schema, sample);
+    test:assertTrue(result is error);
+}
+
+@test:Config
+function testValidateJsonSchemaArrayNotArray() returns error? {
+    map<json> schema = {
+        "type": "array",
+        "items": {"type": "string"}
+    };
+    json sample = "not an array";
+    error? result = validateJsonSchema(schema, sample);
+    test:assertTrue(result is error);
 }
 
 @test:Config
@@ -320,4 +356,57 @@ function extractJsonFromCodeBlockDataProvider() returns [string, string, string]
 function testExtractJsonFromCodeBlock(string description, string response, string expected) {
     string result = extractJsonFromCodeBlock(response);
     test:assertEquals(result, expected);
+}
+
+// ============================================
+// Array Schema End-to-End Tests
+// ============================================
+
+@test:Config
+function testArrayOutputSchemaEndToEnd() returns error? {
+    // Parse AFM and start agent on a different port to avoid conflicts
+    string content = check io:fileReadString("tests/sample_array_agent.afm.md");
+    AFMRecord afm = check parseAfm(content);
+
+    int testPort = 9195;
+    future<error?> _ = start runAgentFromAFM(afm, testPort);
+
+    // Wait for agent to start
+    runtime:sleep(2);
+
+    // Create HTTP client to call the agent
+    http:Client agentClient = check new (string `http://localhost:${testPort}`);
+
+    // Call the agent with array output schema
+    json response = check agentClient->post("/list", {"query": "List some fruits"});
+
+    // Verify the response is an array
+    test:assertTrue(response is json[], "Response should be an array");
+    json[] responseArray = <json[]>response;
+    test:assertEquals(responseArray.length(), 3);
+    test:assertEquals(responseArray[0], "apple");
+    test:assertEquals(responseArray[1], "banana");
+    test:assertEquals(responseArray[2], "cherry");
+}
+
+@test:Config
+function testArrayOutputSchemaInvalidResponse() returns error? {
+    // Parse AFM and start agent on a different port
+    string content = check io:fileReadString("tests/sample_array_agent.afm.md");
+    AFMRecord afm = check parseAfm(content);
+
+    int testPort = 9196;
+    future<error?> _ = start runAgentFromAFM(afm, testPort);
+
+    // Wait for agent to start
+    runtime:sleep(2);
+
+    // Create HTTP client to call the agent
+    http:Client agentClient = check new (string `http://localhost:${testPort}`);
+
+    // Call the agent with prompt that triggers invalid response (array with non-string item)
+    http:Response response = check agentClient->post("/list", {"query": "List with invalid items"});
+
+    // Should return 500 error due to schema validation failure
+    test:assertEquals(response.statusCode, 500, "Should return 500 for schema validation failure");
 }

@@ -45,7 +45,10 @@ public function main(string? filePath = ()) returns error? {
     string content = check io:fileReadString(fileToUse);
 
     AFMRecord afm = check parseAfm(content);
+    check runAgentFromAFM(afm, port);    
+}
 
+function runAgentFromAFM(AFMRecord afm, int port) returns error? {
     AgentMetadata metadata = afm.metadata;
 
     Interface[] agentInterfaces = metadata.interfaces ?: [<ConsoleChatInterface>{}];

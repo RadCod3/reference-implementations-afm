@@ -422,7 +422,7 @@ modules = [
 [[package]]
 org = "ballerina"
 name = "websubhub"
-version = "1.15.1"
+version = "1.15.2"
 scope = "testOnly"
 dependencies = [
 	{org = "ballerina", name = "crypto"},

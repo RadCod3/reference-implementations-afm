@@ -87,6 +87,16 @@ final string[] & readonly mockResponses = [
 
 // Generate mock LLM responses by index
 function getMockLLMResponse(string userMessage) returns string {
+    // Return JSON array for array schema tests
+    if userMessage.includes("List some fruits") {
+        return "```json\n{\"value\": [\"apple\", \"banana\", \"cherry\"]}\n```";
+    }
+
+    // Return invalid array (contains non-string) for negative test
+    if userMessage.includes("List with invalid items") {
+        return "```json\n{\"value\": [\"apple\", 123, \"cherry\"]}\n```";
+    }
+
     if mockResponseCounter < mockResponses.length() {
         string response = mockResponses[mockResponseCounter];
         mockResponseCounter += 1;

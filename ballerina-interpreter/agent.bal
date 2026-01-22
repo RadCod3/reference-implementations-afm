@@ -139,10 +139,10 @@ function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), map
             return error AgentError("Invalid output schema, expected a 'type' field", schemaType);
         }
 
-        if schemaType !is "object"|"array" {
+        if schemaType !is "object" {
             effectiveOutputSchema = {
                 "type": "object",
-                "properties": { "value": { "type": schemaType } },
+                "properties": { "value": outputSchema },
                 "required": ["value"]
             };
             isUpdatedSchema = true;
@@ -163,9 +163,14 @@ function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), map
         return error AgentError("Agent run failed", run);
     }
 
+    // If no output schema, return raw response without JSON parsing
+    if effectiveOutputSchema is () {
+        return run;
+    }
+
     string responseJsonStr = extractJsonFromCodeBlock(run);
 
-    json|error responseJson = responseJsonStr.toJsonString().fromJsonString();
+    json|error responseJson = responseJsonStr.fromJsonString();
 
     if responseJson is error {
         log:printError("Failed to parse agent response JSON", 'error = responseJson);
@@ -177,7 +182,18 @@ function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), map
         log:printError("Agent response does not conform to output schema", 'error = validateOutputSchemaResult);
         return error AgentError("Agent response does not conform to output schema", validateOutputSchemaResult);
     }
-    return isUpdatedSchema ? (<map<json>> responseJson).get("value") : responseJson;
+
+    if !isUpdatedSchema {
+        return responseJson;
+    }
+
+    map<json>|error responseJsonObject = responseJson.ensureType();
+    if responseJsonObject is error {
+        log:printError("Expected agent response to be a JSON object", 'error = responseJsonObject);
+        return error AgentError("Expected agent response to be a JSON object");
+    }
+
+    return responseJsonObject.get("value");
 }
 
 function extractJsonFromCodeBlock(string response) returns string {
@@ -268,7 +284,7 @@ isolated function validateJsonSchema(map<json>? jsonSchemaVal, json sampleJson) 
     // Wrap value and validate using generated object schema
     map<json> valueSchema = {
         "type": "object",
-        "properties": { "value": { "type": schemaType } },
+        "properties": { "value": jsonSchemaVal },
         "required": ["value"]
     };
     validator:JSONObject schemaObject = validator:newJSONObject7(valueSchema.toJsonString());
