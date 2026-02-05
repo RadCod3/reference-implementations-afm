@@ -4,6 +4,21 @@
 """LangChain AFM Interpreter.
 
 A Python implementation of the AFM (Agent-Flavored Markdown) specification v0.3.0.
+
+This package provides:
+
+- **Parser**: Parse AFM files into structured Python objects
+- **Agent**: Execute agents using LangChain
+- **Interfaces**: Console chat, web chat, and webhook handlers
+
+Example usage::
+
+    from langchain_interpreter import parse_afm_file, Agent
+    from langchain_interpreter.interfaces import run_console_chat
+
+    afm = parse_afm_file("my_agent.afm.md")
+    agent = Agent(afm)
+    run_console_chat(agent)
 """
 
 from .agent import Agent
@@ -14,6 +29,7 @@ from .exceptions import (
     AgentConfigError,
     AgentError,
     InputValidationError,
+    InterfaceNotFoundError,
     JSONAccessError,
     OutputValidationError,
     ProviderError,
@@ -21,6 +37,24 @@ from .exceptions import (
     TemplateError,
     TemplateEvaluationError,
     VariableResolutionError,
+)
+from .interfaces import (
+    WebSubSubscriber,
+    async_run_console_chat,
+    create_webchat_app,
+    create_webhook_app,
+    get_console_interface,
+    get_http_path,
+    get_interface_by_type,
+    get_interfaces,
+    get_primary_interface,
+    get_webchat_interface,
+    get_webhook_interface,
+    has_interface_type,
+    run_console_chat,
+    run_webchat_server,
+    run_webhook_server,
+    verify_webhook_signature,
 )
 from .models import (
     AFMRecord,
@@ -140,6 +174,23 @@ __all__ = [
     "ProviderError",
     "InputValidationError",
     "OutputValidationError",
+    "InterfaceNotFoundError",
+    "get_interfaces",
+    "get_interface_by_type",
+    "get_console_interface",
+    "get_webchat_interface",
+    "get_webhook_interface",
+    "get_primary_interface",
+    "has_interface_type",
+    "get_http_path",
+    "run_console_chat",
+    "async_run_console_chat",
+    "create_webchat_app",
+    "run_webchat_server",
+    "create_webhook_app",
+    "run_webhook_server",
+    "WebSubSubscriber",
+    "verify_webhook_signature",
 ]
 
 
