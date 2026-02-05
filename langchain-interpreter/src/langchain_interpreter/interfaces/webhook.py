@@ -21,7 +21,7 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, AsyncGenerator
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
@@ -31,7 +31,7 @@ from .base import InterfaceNotFoundError, get_http_path, get_webhook_interface
 
 if TYPE_CHECKING:
     from ..agent import Agent
-    from ..models import CompiledTemplate
+    from ..models import CompiledTemplate, WebhookInterface
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +275,153 @@ def verify_webhook_signature(
 
 
 # =============================================================================
+# Webhook Router Factory
+# =============================================================================
+
+
+def create_webhook_router(
+    agent: Agent,
+    interface: WebhookInterface,
+    path: str = "/webhook",
+    *,
+    verify_signatures: bool = True,
+) -> APIRouter:
+    """Create an APIRouter with webhook endpoints.
+
+    This function creates a router that can be mounted on any FastAPI app.
+    It's used internally by create_webhook_app() and can be used directly
+    for composing unified apps with multiple interfaces.
+
+    Args:
+        agent: The AFM agent to expose.
+        interface: The webhook interface configuration.
+        path: The path for the webhook endpoint. Defaults to "/webhook".
+        verify_signatures: Whether to verify HMAC signatures. Defaults to True.
+
+    Returns:
+        An APIRouter with the webhook endpoints.
+    """
+    router = APIRouter()
+
+    # Compile the prompt template if provided
+    compiled_prompt: CompiledTemplate | None = None
+    if interface.prompt:
+        compiled_prompt = compile_template(interface.prompt)
+
+    # Get signature configuration
+    signature = interface.signature
+    output_is_string = signature.output.type == "string"
+
+    # Get subscription configuration
+    subscription = interface.subscription
+    secret = _resolve_secret(subscription.secret)
+
+    # WebSub verification endpoint
+    @router.get(path)
+    async def websub_verification(
+        request: Request,
+        hub_mode: str = Query(..., alias="hub.mode"),
+        hub_topic: str = Query(..., alias="hub.topic"),
+        hub_challenge: str = Query(..., alias="hub.challenge"),
+        hub_lease_seconds: int | None = Query(None, alias="hub.lease_seconds"),
+    ) -> PlainTextResponse:
+        """WebSub subscription verification endpoint."""
+        # Check for subscriber in app state (for topic verification)
+        websub_subscriber = getattr(request.app.state, "websub_subscriber", None)
+
+        if hub_mode in ("subscribe", "unsubscribe"):
+            # If we have a subscriber, verify the topic matches
+            if websub_subscriber is not None:
+                if hub_topic != websub_subscriber.topic:
+                    raise HTTPException(status_code=404, detail="Topic mismatch")
+                # Mark as verified on successful verification
+                if hub_mode == "subscribe":
+                    websub_subscriber._verified = True
+            elif websub_subscriber is None and hasattr(
+                request.app.state, "websub_subscriber"
+            ):
+                # Subscriber was explicitly set to None - reject verification
+                raise HTTPException(status_code=404, detail="No subscriber configured")
+
+            return PlainTextResponse(content=hub_challenge)
+        raise HTTPException(status_code=404, detail="Invalid mode")
+
+    # Webhook receiver endpoint
+    @router.post(
+        path,
+        responses={
+            400: {"model": ErrorResponse},
+            401: {"model": ErrorResponse},
+            500: {"model": ErrorResponse},
+        },
+    )
+    async def receive_webhook(request: Request) -> JSONResponse:
+        """Receive and process webhook events."""
+        # Get raw body for signature verification
+        body = await request.body()
+
+        # Verify signature if configured
+        if verify_signatures and secret:
+            signature_header = request.headers.get(
+                "X-Hub-Signature-256"
+            ) or request.headers.get("X-Hub-Signature")
+
+            if not verify_webhook_signature(body, signature_header, secret):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid signature",
+                )
+
+        try:
+            # Parse payload
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid JSON payload",
+            )
+
+        # Get headers as dict (cast to expected type)
+        headers: dict[str, str | list[str]] = dict(request.headers)
+
+        # Construct user prompt
+        if compiled_prompt:
+            user_prompt = evaluate_template(compiled_prompt, payload, headers)
+        else:
+            # Default: stringify the payload
+            user_prompt = json.dumps(payload, indent=2)
+
+        try:
+            # Run the agent
+            response = await agent.arun(user_prompt)
+
+            # Format response based on output schema
+            if output_is_string:
+                if not isinstance(response, str):
+                    response = json.dumps(response)
+                return JSONResponse(content={"result": response})
+            else:
+                if isinstance(response, dict):
+                    return JSONResponse(content=response)
+                elif isinstance(response, str):
+                    try:
+                        return JSONResponse(content=json.loads(response))
+                    except json.JSONDecodeError:
+                        return JSONResponse(content={"result": response})
+                else:
+                    return JSONResponse(content={"result": response})
+
+        except Exception as e:
+            logger.error(f"Agent execution error: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=str(e),
+            )
+
+    return router
+
+
+# =============================================================================
 # Webhook App Factory
 # =============================================================================
 
@@ -330,16 +477,7 @@ def create_webhook_app(
             "Add a webhook interface to the agent's metadata."
         )
 
-    # Compile the prompt template if provided
-    compiled_prompt: CompiledTemplate | None = None
-    if interface.prompt:
-        compiled_prompt = compile_template(interface.prompt)
-
-    # Get signature configuration
-    signature = interface.signature
-    output_is_string = signature.output.type == "string"
-
-    # Get subscription configuration
+    # Get subscription configuration for WebSub
     subscription = interface.subscription
     secret = _resolve_secret(subscription.secret)
 
@@ -377,13 +515,12 @@ def create_webhook_app(
     # Store references in app state
     app.state.agent = agent
     app.state.interface = interface
-    app.state.compiled_prompt = compiled_prompt
     app.state.websub_subscriber = websub_subscriber
     app.state.secret = secret
     app.state.verify_signatures = verify_signatures
 
     # ==========================================================================
-    # Endpoints
+    # Health Endpoint
     # ==========================================================================
 
     @app.get("/health", response_model=HealthResponse)
@@ -391,116 +528,14 @@ def create_webhook_app(
         """Health check endpoint."""
         return HealthResponse(status="ok")
 
-    @app.get(webhook_path)
-    async def websub_verification(
-        request: Request,
-        hub_mode: str = Query(..., alias="hub.mode"),
-        hub_topic: str = Query(..., alias="hub.topic"),
-        hub_challenge: str = Query(..., alias="hub.challenge"),
-        hub_lease_seconds: int | None = Query(None, alias="hub.lease_seconds"),
-    ) -> Response:
-        """WebSub subscription verification endpoint.
+    # ==========================================================================
+    # Include Webhook Router
+    # ==========================================================================
 
-        This endpoint handles the verification callback from WebSub hubs
-        during subscription and unsubscription.
-        """
-        subscriber = request.app.state.websub_subscriber
-        if not subscriber:
-            raise HTTPException(
-                status_code=404,
-                detail="WebSub not configured for this webhook",
-            )
-
-        challenge = subscriber.verify_challenge(
-            mode=hub_mode,
-            topic=hub_topic,
-            challenge=hub_challenge,
-            lease_seconds=hub_lease_seconds,
-        )
-
-        if challenge is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Verification failed",
-            )
-
-        return PlainTextResponse(content=challenge)
-
-    @app.post(
-        webhook_path,
-        responses={
-            400: {"model": ErrorResponse},
-            401: {"model": ErrorResponse},
-            500: {"model": ErrorResponse},
-        },
+    webhook_router = create_webhook_router(
+        agent, interface, webhook_path, verify_signatures=verify_signatures
     )
-    async def receive_webhook(request: Request) -> JSONResponse:
-        """Receive and process webhook events.
-
-        This endpoint receives webhook payloads, optionally verifies
-        signatures, evaluates the prompt template, runs the agent,
-        and returns the response.
-        """
-        # Get raw body for signature verification
-        body = await request.body()
-
-        # Verify signature if configured
-        if verify_signatures and secret:
-            signature_header = request.headers.get(
-                "X-Hub-Signature-256"
-            ) or request.headers.get("X-Hub-Signature")
-
-            if not verify_webhook_signature(body, signature_header, secret):
-                raise HTTPException(
-                    status_code=401,
-                    detail="Invalid signature",
-                )
-
-        try:
-            # Parse payload
-            payload = json.loads(body)
-        except json.JSONDecodeError:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid JSON payload",
-            )
-
-        # Get headers as dict
-        headers = dict(request.headers)
-
-        # Construct user prompt
-        if compiled_prompt:
-            user_prompt = evaluate_template(compiled_prompt, payload, headers)
-        else:
-            # Default: stringify the payload
-            user_prompt = json.dumps(payload, indent=2)
-
-        try:
-            # Run the agent
-            response = await agent.arun(user_prompt)
-
-            # Format response based on output schema
-            if output_is_string:
-                if not isinstance(response, str):
-                    response = json.dumps(response)
-                return JSONResponse(content={"result": response})
-            else:
-                if isinstance(response, dict):
-                    return JSONResponse(content=response)
-                elif isinstance(response, str):
-                    try:
-                        return JSONResponse(content=json.loads(response))
-                    except json.JSONDecodeError:
-                        return JSONResponse(content={"result": response})
-                else:
-                    return JSONResponse(content={"result": response})
-
-        except Exception as e:
-            logger.error(f"Agent execution error: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=str(e),
-            )
+    app.include_router(webhook_router)
 
     return app
 

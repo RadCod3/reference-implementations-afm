@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -21,6 +21,7 @@ from .base import get_http_path, get_webchat_interface, InterfaceNotFoundError
 
 if TYPE_CHECKING:
     from ..agent import Agent
+    from ..models import Signature
 
 
 # =============================================================================
@@ -69,102 +70,40 @@ class ErrorResponse(BaseModel):
 
 
 # =============================================================================
-# Web Chat App Factory
+# Webchat Router Factory
 # =============================================================================
 
 
-def create_webchat_app(
+def create_webchat_router(
     agent: Agent,
-    *,
-    cors_origins: list[str] | None = None,
-    path: str | None = None,
-) -> FastAPI:
-    """Create a FastAPI application for web chat.
+    signature: Signature,
+    path: str = "/chat",
+) -> APIRouter:
+    """Create an APIRouter with webchat endpoints.
 
-    This function creates a FastAPI app that exposes the agent as an HTTP
-    REST endpoint. The app includes:
-
-    - POST {path} - Chat endpoint (default: /chat)
-    - GET / - Agent metadata
-    - GET /health - Health check
+    This function creates a router that can be mounted on any FastAPI app.
+    It's used internally by create_webchat_app() and can be used directly
+    for composing unified apps with multiple interfaces.
 
     Args:
         agent: The AFM agent to expose.
-        cors_origins: Optional list of allowed CORS origins.
-                     If provided, CORS middleware will be added.
-        path: Optional custom path for the chat endpoint.
-              If not provided, uses the path from the interface configuration
-              or defaults to "/chat".
+        signature: The interface signature defining input/output types.
+        path: The path for the chat endpoint. Defaults to "/chat".
 
     Returns:
-        A FastAPI application instance.
-
-    Example:
-        >>> from langchain_interpreter import parse_afm_file, Agent
-        >>> from langchain_interpreter.interfaces import create_webchat_app
-        >>> import uvicorn
-        >>> afm = parse_afm_file("my_agent.afm.md")
-        >>> agent = Agent(afm)
-        >>> app = create_webchat_app(agent, cors_origins=["http://localhost:3000"])
-        >>> uvicorn.run(app, host="0.0.0.0", port=8000)
+        An APIRouter with the webchat endpoints.
     """
-    # Get interface configuration
-    try:
-        interface = get_webchat_interface(agent.afm)
-        chat_path = path or get_http_path(interface)
-        signature = interface.signature
-    except InterfaceNotFoundError:
-        # No webchat interface defined - use defaults
-        chat_path = path or "/chat"
-        signature = agent._signature  # Use agent's default signature
+    router = APIRouter()
 
     # Determine if we need simple string I/O or complex schema
     input_is_string = signature.input.type == "string"
     output_is_string = signature.output.type == "string"
 
-    # Create the FastAPI app
-    app = FastAPI(
-        title=agent.name,
-        description=agent.description or f"Web chat interface for {agent.name}",
-        version=agent.afm.metadata.version or "0.0.0",
-    )
-
-    # Add CORS middleware if origins specified
-    if cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-
-    # Store agent reference
-    app.state.agent = agent
-
-    # ==========================================================================
-    # Endpoints
-    # ==========================================================================
-
-    @app.get("/", response_model=AgentInfo)
-    async def get_agent_info() -> AgentInfo:
-        """Get agent metadata."""
-        return AgentInfo(
-            name=agent.name,
-            description=agent.description,
-            version=agent.afm.metadata.version,
-        )
-
-    @app.get("/health", response_model=HealthResponse)
-    async def health_check() -> HealthResponse:
-        """Health check endpoint."""
-        return HealthResponse(status="ok")
-
     # Create the appropriate chat endpoint based on signature
     if input_is_string and output_is_string:
         # Simple string-to-string chat
-        @app.post(
-            chat_path,
+        @router.post(
+            path,
             response_model=StringChatResponse,
             responses={
                 400: {"model": ErrorResponse},
@@ -195,8 +134,8 @@ def create_webchat_app(
 
     else:
         # Complex schema-based chat
-        @app.post(
-            chat_path,
+        @router.post(
+            path,
             responses={
                 400: {"model": ErrorResponse},
                 500: {"model": ErrorResponse},
@@ -260,6 +199,104 @@ def create_webchat_app(
                     status_code=500,
                     detail=str(e),
                 )
+
+    return router
+
+
+# =============================================================================
+# Web Chat App Factory
+# =============================================================================
+
+
+def create_webchat_app(
+    agent: Agent,
+    *,
+    cors_origins: list[str] | None = None,
+    path: str | None = None,
+) -> FastAPI:
+    """Create a FastAPI application for web chat.
+
+    This function creates a FastAPI app that exposes the agent as an HTTP
+    REST endpoint. The app includes:
+
+    - POST {path} - Chat endpoint (default: /chat)
+    - GET / - Agent metadata
+    - GET /health - Health check
+
+    Args:
+        agent: The AFM agent to expose.
+        cors_origins: Optional list of allowed CORS origins.
+                     If provided, CORS middleware will be added.
+        path: Optional custom path for the chat endpoint.
+              If not provided, uses the path from the interface configuration
+              or defaults to "/chat".
+
+    Returns:
+        A FastAPI application instance.
+
+    Example:
+        >>> from langchain_interpreter import parse_afm_file, Agent
+        >>> from langchain_interpreter.interfaces import create_webchat_app
+        >>> import uvicorn
+        >>> afm = parse_afm_file("my_agent.afm.md")
+        >>> agent = Agent(afm)
+        >>> app = create_webchat_app(agent, cors_origins=["http://localhost:3000"])
+        >>> uvicorn.run(app, host="0.0.0.0", port=8000)
+    """
+    # Get interface configuration
+    try:
+        interface = get_webchat_interface(agent.afm)
+        chat_path = path or get_http_path(interface)
+        signature = interface.signature
+    except InterfaceNotFoundError:
+        # No webchat interface defined - use defaults
+        chat_path = path or "/chat"
+        signature = agent._signature  # Use agent's default signature
+
+    # Create the FastAPI app
+    app = FastAPI(
+        title=agent.name,
+        description=agent.description or f"Web chat interface for {agent.name}",
+        version=agent.afm.metadata.version or "0.0.0",
+    )
+
+    # Add CORS middleware if origins specified
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    # Store agent reference
+    app.state.agent = agent
+
+    # ==========================================================================
+    # Metadata Endpoints
+    # ==========================================================================
+
+    @app.get("/", response_model=AgentInfo)
+    async def get_agent_info() -> AgentInfo:
+        """Get agent metadata."""
+        return AgentInfo(
+            name=agent.name,
+            description=agent.description,
+            version=agent.afm.metadata.version,
+        )
+
+    @app.get("/health", response_model=HealthResponse)
+    async def health_check() -> HealthResponse:
+        """Health check endpoint."""
+        return HealthResponse(status="ok")
+
+    # ==========================================================================
+    # Include Chat Router
+    # ==========================================================================
+
+    chat_router = create_webchat_router(agent, signature, chat_path)
+    app.include_router(chat_router)
 
     return app
 

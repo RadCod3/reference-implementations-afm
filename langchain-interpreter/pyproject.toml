@@ -19,10 +19,11 @@ dependencies = [
     "uvicorn>=0.40.0",
     "mcp>=1.26.0",
     "langchain-mcp-adapters>=0.2.1",
+    "click>=8.0.0",
 ]
 
 [project.scripts]
-langchain-interpreter = "langchain_interpreter:main"
+afm = "langchain_interpreter.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.9.28,<0.10.0"]

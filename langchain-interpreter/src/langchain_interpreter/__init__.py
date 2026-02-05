@@ -113,6 +113,7 @@ from .variables import (
     resolve_variables,
     validate_http_variables,
 )
+from .cli import create_unified_app, main
 
 __version__ = "0.1.0"
 
@@ -212,9 +213,7 @@ __all__ = [
     "run_webhook_server",
     "WebSubSubscriber",
     "verify_webhook_signature",
+    # CLI
+    "main",
+    "create_unified_app",
 ]
-
-
-def main() -> None:
-    """CLI entry point."""
-    print("LangChain AFM Interpreter v" + __version__)
