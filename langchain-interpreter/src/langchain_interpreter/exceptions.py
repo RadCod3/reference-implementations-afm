@@ -107,3 +107,15 @@ class OutputValidationError(AFMValidationError):
     def __init__(self, message: str, schema_path: str | None = None):
         self.schema_path = schema_path
         super().__init__(message, field="output")
+
+
+class InterfaceNotFoundError(AFMError):
+    """Raised when a requested interface type is not found in the agent."""
+
+    def __init__(self, interface_type: str, available: list[str]) -> None:
+        self.interface_type = interface_type
+        self.available = available
+        super().__init__(
+            f"Interface type '{interface_type}' not found. "
+            f"Available: {available if available else ['consolechat (default)']}"
+        )

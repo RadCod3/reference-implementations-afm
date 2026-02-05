@@ -16,6 +16,11 @@ import re
 from typing import TYPE_CHECKING
 
 from .exceptions import AFMValidationError, VariableResolutionError
+from .models import (
+    ConsoleChatInterface,
+    WebChatInterface,
+    WebhookInterface,
+)
 
 if TYPE_CHECKING:
     from .models import (
@@ -192,22 +197,23 @@ def validate_http_variables(afm_record: AFMRecord) -> None:
     # Check interfaces
     if metadata.interfaces:
         for interface in metadata.interfaces:
-            if interface.type == "consolechat":
-                if _signature_contains_http_variable(interface.signature):
-                    errored_fields.append("interfaces.consolechat.signature")
-            elif interface.type == "webchat":
-                if _signature_contains_http_variable(interface.signature):
-                    errored_fields.append("interfaces.webchat.signature")
-                if _exposure_contains_http_variable(interface.exposure):
-                    errored_fields.append("interfaces.webchat.exposure")
-            elif interface.type == "webhook":
-                # Note: webhook.prompt is allowed to contain http: variables
-                if _signature_contains_http_variable(interface.signature):
-                    errored_fields.append("interfaces.webhook.signature")
-                if _exposure_contains_http_variable(interface.exposure):
-                    errored_fields.append("interfaces.webhook.exposure")
-                if _subscription_contains_http_variable(interface.subscription):
-                    errored_fields.append("interfaces.webhook.subscription")
+            match interface:
+                case ConsoleChatInterface():
+                    if _signature_contains_http_variable(interface.signature):
+                        errored_fields.append("interfaces.consolechat.signature")
+                case WebChatInterface():
+                    if _signature_contains_http_variable(interface.signature):
+                        errored_fields.append("interfaces.webchat.signature")
+                    if _exposure_contains_http_variable(interface.exposure):
+                        errored_fields.append("interfaces.webchat.exposure")
+                case WebhookInterface():
+                    # Note: webhook.prompt is allowed to contain http: variables
+                    if _signature_contains_http_variable(interface.signature):
+                        errored_fields.append("interfaces.webhook.signature")
+                    if _exposure_contains_http_variable(interface.exposure):
+                        errored_fields.append("interfaces.webhook.exposure")
+                    if _subscription_contains_http_variable(interface.subscription):
+                        errored_fields.append("interfaces.webhook.subscription")
 
     # Check tools
     if metadata.tools and metadata.tools.mcp:
