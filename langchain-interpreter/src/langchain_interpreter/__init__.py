@@ -31,6 +31,10 @@ from .exceptions import (
     InputValidationError,
     InterfaceNotFoundError,
     JSONAccessError,
+    MCPAuthenticationError,
+    MCPConnectionError,
+    MCPError,
+    MCPToolError,
     OutputValidationError,
     ProviderError,
     TemplateCompilationError,
@@ -98,6 +102,12 @@ from .schema_validator import (
     validate_output,
 )
 from .templates import access_json_field, compile_template, evaluate_template
+from .tools import (
+    MCPClient,
+    MCPManager,
+    build_auth_headers,
+    filter_tools,
+)
 from .variables import (
     contains_http_variable,
     resolve_variables,
@@ -175,6 +185,17 @@ __all__ = [
     "InputValidationError",
     "OutputValidationError",
     "InterfaceNotFoundError",
+    # MCP Exceptions
+    "MCPError",
+    "MCPConnectionError",
+    "MCPToolError",
+    "MCPAuthenticationError",
+    # MCP Classes
+    "MCPClient",
+    "MCPManager",
+    "build_auth_headers",
+    "filter_tools",
+    # Interface Functions
     "get_interfaces",
     "get_interface_by_type",
     "get_console_interface",

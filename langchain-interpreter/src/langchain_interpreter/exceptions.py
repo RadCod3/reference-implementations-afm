@@ -119,3 +119,37 @@ class InterfaceNotFoundError(AFMError):
             f"Interface type '{interface_type}' not found. "
             f"Available: {available if available else ['consolechat (default)']}"
         )
+
+
+class MCPError(AFMError):
+    """Base exception for MCP-related errors."""
+
+    def __init__(self, message: str, server_name: str | None = None):
+        self.server_name = server_name
+        if server_name is not None:
+            message = f"MCP server '{server_name}': {message}"
+        super().__init__(message)
+
+
+class MCPConnectionError(MCPError):
+    """Raised when connection to an MCP server fails."""
+
+    pass
+
+
+class MCPToolError(MCPError):
+    """Raised when an MCP tool call fails."""
+
+    def __init__(
+        self, message: str, server_name: str | None = None, tool_name: str | None = None
+    ):
+        self.tool_name = tool_name
+        if tool_name is not None:
+            message = f"Tool '{tool_name}': {message}"
+        super().__init__(message, server_name)
+
+
+class MCPAuthenticationError(MCPError):
+    """Raised when MCP server authentication fails."""
+
+    pass
