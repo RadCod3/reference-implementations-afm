@@ -63,7 +63,24 @@ class TestClientAuthentication:
     def test_missing_type_fails(self) -> None:
         """Test that missing type field fails validation."""
         with pytest.raises(ValidationError):
-            ClientAuthentication()
+            ClientAuthentication()  # ty:ignore[missing-argument]
+
+    def test_bearer_missing_token(self) -> None:
+        """Test bearer auth missing token."""
+        with pytest.raises(ValidationError, match="type 'bearer' requires 'token'"):
+            ClientAuthentication(type="bearer")
+
+    def test_basic_missing_fields(self) -> None:
+        """Test basic auth missing username or password."""
+        with pytest.raises(ValidationError, match="requires 'username' and 'password'"):
+            ClientAuthentication(type="basic", username="user")
+        with pytest.raises(ValidationError, match="requires 'username' and 'password'"):
+            ClientAuthentication(type="basic", password="pass")
+
+    def test_api_key_missing_key(self) -> None:
+        """Test API key auth missing api_key."""
+        with pytest.raises(ValidationError, match="type 'api-key' requires 'api_key'"):
+            ClientAuthentication(type="api-key")
 
 
 class TestTransport:
@@ -225,6 +242,7 @@ class TestInterfaces:
         interface = WebChatInterface(
             exposure=Exposure(http=HTTPExposure(path="/custom"))
         )
+        assert interface.exposure.http is not None
         assert interface.exposure.http.path == "/custom"
 
     def test_webhook_interface(self) -> None:
@@ -242,7 +260,7 @@ class TestInterfaces:
     def test_webhook_requires_subscription(self) -> None:
         """Test that webhook requires subscription."""
         with pytest.raises(ValidationError):
-            WebhookInterface()
+            WebhookInterface()  # ty:ignore[missing-argument]
 
 
 class TestAgentMetadata:
@@ -281,4 +299,4 @@ class TestAgentMetadata:
     def test_invalid_max_iterations(self) -> None:
         """Test invalid max_iterations type."""
         with pytest.raises(ValidationError):
-            AgentMetadata(max_iterations="invalid")
+            AgentMetadata(max_iterations="invalid")  # ty:ignore[invalid-argument-type]

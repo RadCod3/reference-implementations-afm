@@ -8,6 +8,7 @@ interfaces:
   - type: consolechat
 max_iterations: 5
 model:
+  name: "gpt-4"
   provider: "openai"
   url: "https://api.openai.com/v1/chat/completions"
   authentication:

@@ -6,9 +6,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # =============================================================================
@@ -38,6 +38,27 @@ class ClientAuthentication(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     type: str
+    token: str | None = None
+    username: str | None = None
+    password: str | None = None
+    api_key: str | None = None
+
+    @model_validator(mode="after")
+    def validate_type_fields(self) -> Self:
+        """Validate that the required fields for each type are present."""
+        match self.type:
+            case "bearer":
+                if self.token is None:
+                    raise ValueError("type 'bearer' requires 'token' field")
+            case "basic":
+                if self.username is None or self.password is None:
+                    raise ValueError(
+                        "type 'basic' requires 'username' and 'password' fields"
+                    )
+            case "api-key":
+                if self.api_key is None:
+                    raise ValueError("type 'api-key' requires 'api_key' field")
+        return self
 
 
 class Model(BaseModel):

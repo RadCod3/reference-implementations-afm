@@ -89,6 +89,10 @@ class TestParseAfm:
         # Check model
         assert result.metadata.model is not None
         assert result.metadata.model.provider == "openai"
+        assert result.metadata.model.name == "gpt-4"
+        assert result.metadata.model.authentication is not None
+        assert result.metadata.model.authentication.type == "bearer"
+        assert result.metadata.model.authentication.token == "mock-token"
 
     def test_parse_webhook_agent(self, sample_webhook_path: Path) -> None:
         """Test parsing a webhook agent."""
