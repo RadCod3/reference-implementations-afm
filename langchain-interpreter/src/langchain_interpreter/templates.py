@@ -16,6 +16,7 @@ from typing import Any
 from .exceptions import (
     JSONAccessError,
     TemplateCompilationError,
+    TemplateEvaluationError,
 )
 from .models import (
     CompiledTemplate,
@@ -190,9 +191,12 @@ def _handle_payload_variable(
             parts.append(value)
         else:
             parts.append(json.dumps(value))
-    except JSONAccessError:
-        # Missing field - add empty string
-        parts.append("")
+    except JSONAccessError as e:
+        raise TemplateEvaluationError(
+            f"Cannot resolve payload variable '${{http:payload.{segment.path}}}': "
+            f"field not found",
+            template=f"http:payload.{segment.path}",
+        ) from e
 
 
 def _handle_header_variable(
@@ -208,8 +212,11 @@ def _handle_header_variable(
         segment: The HeaderVariable segment.
     """
     if headers is None:
-        parts.append("")
-        return
+        raise TemplateEvaluationError(
+            f"Cannot resolve header variable '${{http:header.{segment.name}}}': "
+            "no headers provided",
+            template=f"http:header.{segment.name}",
+        )
 
     # Case-insensitive header lookup
     header_name_lower = segment.name.lower()
@@ -222,7 +229,11 @@ def _handle_header_variable(
             return
 
     # Header not found
-    parts.append("")
+    raise TemplateEvaluationError(
+        f"Cannot resolve header variable '${{http:header.{segment.name}}}': "
+        f"header not found",
+        template=f"http:header.{segment.name}",
+    )
 
 
 def access_json_field(payload: Any, path: str) -> Any:

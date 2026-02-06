@@ -9,8 +9,7 @@ implementations (console chat, web chat, webhook).
 
 from __future__ import annotations
 
-from langchain_interpreter import InterfaceNotFoundError
-
+from ..exceptions import InterfaceNotFoundError
 from ..models import (
     AFMRecord,
     ConsoleChatInterface,

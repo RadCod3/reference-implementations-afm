@@ -25,7 +25,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from ..exceptions import VariableResolutionError
+from ..exceptions import TemplateEvaluationError, VariableResolutionError
 from ..templates import compile_template, evaluate_template
 from ..variables import resolve_variables
 from .base import InterfaceNotFoundError, get_http_path, get_webhook_interface
@@ -387,7 +387,13 @@ def create_webhook_router(
 
         # Construct user prompt
         if compiled_prompt:
-            user_prompt = evaluate_template(compiled_prompt, payload, headers)
+            try:
+                user_prompt = evaluate_template(compiled_prompt, payload, headers)
+            except TemplateEvaluationError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=str(e),
+                )
         else:
             # Default: stringify the payload
             user_prompt = json.dumps(payload, indent=2)

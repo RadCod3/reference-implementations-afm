@@ -12,6 +12,7 @@ from langchain_interpreter import (
     LiteralSegment,
     PayloadVariable,
     TemplateCompilationError,
+    TemplateEvaluationError,
     access_json_field,
     compile_template,
     evaluate_template,
@@ -212,26 +213,32 @@ class TestEvaluateTemplate:
         assert result == "application/json, text/html"
 
     def test_evaluate_missing_header(self) -> None:
-        """Test evaluating missing header returns empty string."""
+        """Test evaluating missing header raises TemplateEvaluationError."""
         compiled = CompiledTemplate(segments=(HeaderVariable(name="NonExistent"),))
         headers = {"Authorization": "Bearer token"}
-        result = evaluate_template(compiled, {}, headers)
-        assert result == ""
+        with pytest.raises(TemplateEvaluationError) as exc_info:
+            evaluate_template(compiled, {}, headers)
+        assert "NonExistent" in str(exc_info.value)
+        assert exc_info.value.template == "http:header.NonExistent"
 
     def test_evaluate_no_headers(self) -> None:
-        """Test evaluating with no headers provided."""
+        """Test evaluating with no headers provided raises TemplateEvaluationError."""
         compiled = CompiledTemplate(segments=(HeaderVariable(name="Authorization"),))
-        result = evaluate_template(compiled, {}, None)
-        assert result == ""
+        with pytest.raises(TemplateEvaluationError) as exc_info:
+            evaluate_template(compiled, {}, None)
+        assert "no headers provided" in str(exc_info.value)
+        assert exc_info.value.template == "http:header.Authorization"
 
     def test_evaluate_missing_payload_field(self) -> None:
-        """Test evaluating missing payload field returns empty string."""
+        """Test evaluating missing payload field raises TemplateEvaluationError."""
         compiled = CompiledTemplate(
             segments=(PayloadVariable(path="nonexistent.field"),)
         )
         payload = {"name": "test"}
-        result = evaluate_template(compiled, payload, None)
-        assert result == ""
+        with pytest.raises(TemplateEvaluationError) as exc_info:
+            evaluate_template(compiled, payload, None)
+        assert "nonexistent.field" in str(exc_info.value)
+        assert exc_info.value.template == "http:payload.nonexistent.field"
 
     def test_evaluate_non_string_payload(self) -> None:
         """Test evaluating non-string payload value."""
