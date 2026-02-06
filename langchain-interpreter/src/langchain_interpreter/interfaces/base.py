@@ -54,19 +54,14 @@ def get_interface_by_type(
     Raises:
         InterfaceNotFoundError: If the interface type is not found.
     """
-    if isinstance(interface_type, str):
-        interface_type_str = interface_type
-    else:
-        interface_type_str = interface_type.value
-
     interfaces = get_interfaces(afm)
 
     for interface in interfaces:
-        if interface.type == interface_type_str:
+        if interface.type == interface_type.value:
             return interface
 
     available = [iface.type for iface in interfaces]
-    raise InterfaceNotFoundError(interface_type_str, available)
+    raise InterfaceNotFoundError(interface_type.value, available)
 
 
 def get_console_interface(afm: AFMRecord) -> ConsoleChatInterface:

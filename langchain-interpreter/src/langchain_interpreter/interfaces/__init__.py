@@ -46,6 +46,7 @@ Example usage:
 
 # Base utilities
 from .base import (
+    InterfaceNotFoundError,
     get_console_interface,
     get_http_path,
     get_interface_by_type,

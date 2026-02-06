@@ -9,6 +9,7 @@ using FastAPI.
 
 from __future__ import annotations
 
+import html
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -23,7 +24,32 @@ from .base import get_http_path, get_webchat_interface, InterfaceNotFoundError
 CHAT_UI_TEMPLATE_PATH = (
     Path(__file__).resolve().parent.parent / "resources" / "chat-ui.html"
 )
-CHAT_UI_TEMPLATE = CHAT_UI_TEMPLATE_PATH.read_text(encoding="utf-8")
+
+_chat_ui_template_cache: str | None = None
+
+
+def get_chat_ui_template() -> str:
+    """Lazy-load the chat UI template with caching.
+
+    Returns:
+        The contents of the chat-ui.html template file.
+
+    Raises:
+        FileNotFoundError: If the template file is missing, with a clear
+            message indicating the expected path.
+    """
+    global _chat_ui_template_cache
+    if _chat_ui_template_cache is not None:
+        return _chat_ui_template_cache
+    try:
+        _chat_ui_template_cache = CHAT_UI_TEMPLATE_PATH.read_text(encoding="utf-8")
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f"Chat UI template not found at {CHAT_UI_TEMPLATE_PATH}. "
+            "Ensure the resources/chat-ui.html file exists in the package."
+        ) from e
+    return _chat_ui_template_cache
+
 
 if TYPE_CHECKING:
     from ..agent import Agent
@@ -90,12 +116,15 @@ def create_webchat_router(
     router = APIRouter()
     ui_path = f"{path}/ui"
     raw_icon_url = agent.afm.metadata.icon_url
-    icon_url = "" if raw_icon_url is None else str(raw_icon_url)
+    icon_url = "" if raw_icon_url is None else html.escape(str(raw_icon_url))
     icon_style = "" if icon_url else "display:none;"
-    agent_name = str(agent.name)
-    agent_description = "" if agent.description is None else str(agent.description)
+    agent_name = html.escape(str(agent.name))
+    agent_description = (
+        "" if agent.description is None else html.escape(str(agent.description))
+    )
     ui_html = (
-        CHAT_UI_TEMPLATE.replace("{{AGENT_NAME}}", agent_name)
+        get_chat_ui_template()
+        .replace("{{AGENT_NAME}}", agent_name)
         .replace("{{AGENT_DESCRIPTION}}", agent_description)
         .replace("{{AGENT_ICON_URL}}", icon_url)
         .replace("{{AGENT_ICON_STYLE}}", icon_style)

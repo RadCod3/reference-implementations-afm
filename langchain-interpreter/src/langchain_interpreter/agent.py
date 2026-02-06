@@ -408,7 +408,9 @@ class Agent:
             messages: list[Any] = self._build_messages(user_input, session_history)
 
             # Max iterations for tool use
-            max_iterations = self.max_iterations or 10
+            max_iterations = (
+                self.max_iterations if self.max_iterations is not None else 10
+            )
             iterations = 0
             response = None
 
@@ -509,7 +511,9 @@ class Agent:
             messages: list[Any] = self._build_messages(user_input, session_history)
 
             # Max iterations for tool use
-            max_iterations = self.max_iterations or 10
+            max_iterations = (
+                self.max_iterations if self.max_iterations is not None else 10
+            )
             iterations = 0
             response = None
 
