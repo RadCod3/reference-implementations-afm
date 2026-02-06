@@ -25,6 +25,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
+from ..exceptions import VariableResolutionError
 from ..templates import compile_template, evaluate_template
 from ..variables import resolve_variables
 from .base import InterfaceNotFoundError, get_http_path, get_webhook_interface
@@ -574,17 +575,21 @@ def _resolve_secret(secret: str | None) -> str | None:
 
     Returns:
         The resolved secret value, or None if not set.
+
+    Raises:
+        VariableResolutionError: If environment variable resolution fails.
     """
     if not secret:
         return None
 
-    # Use resolve_variables to handle ${env:...} substitution
     try:
-        resolved = resolve_variables(secret)
-        return resolved
-    except Exception:
-        # If resolution fails, return the original value
-        return secret
+        return resolve_variables(secret)
+    except VariableResolutionError as e:
+        logger.warning(f"Failed to resolve secret template '{secret}': {e}")
+        raise
+    except Exception as e:
+        logger.warning(f"Unexpected error resolving secret template '{secret}': {e}")
+        raise
 
 
 def run_webhook_server(

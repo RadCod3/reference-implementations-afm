@@ -20,8 +20,10 @@ from langchain_interpreter import (
     WebhookInterface,
 )
 from langchain_interpreter.agent import Agent
+from langchain_interpreter.exceptions import VariableResolutionError
 from langchain_interpreter.interfaces.webhook import (
     WebSubSubscriber,
+    _resolve_secret,
     create_webhook_app,
     verify_webhook_signature,
 )
@@ -642,3 +644,57 @@ class TestWebSubSubscriberAsync:
             call_args = mock_instance.post.call_args
             data = call_args[1]["data"]
             assert data["hub.mode"] == "unsubscribe"
+
+
+class TestResolveSecret:
+    """Tests for _resolve_secret function."""
+
+    def test_returns_none_for_none(self) -> None:
+        """Test that None returns None."""
+        result = _resolve_secret(None)
+        assert result is None
+
+    def test_returns_none_for_empty_string(self) -> None:
+        """Test that empty string returns None."""
+        result = _resolve_secret("")
+        assert result is None
+
+    def test_returns_secret_without_variables(self) -> None:
+        """Test that secrets without variables are returned as-is."""
+        secret = "my-plain-secret"
+        result = _resolve_secret(secret)
+        assert result == secret
+
+    def test_resolves_env_variable(self, monkeypatch) -> None:
+        """Test that ${env:VAR} is properly resolved."""
+        monkeypatch.setenv("WEBHOOK_SECRET", "resolved-secret-value")
+        result = _resolve_secret("${env:WEBHOOK_SECRET}")
+        assert result == "resolved-secret-value"
+
+    def test_resolves_env_variable_without_prefix(self, monkeypatch) -> None:
+        """Test that ${VAR} is properly resolved (no env: prefix)."""
+        monkeypatch.setenv("SECRET_KEY", "my-secret-key")
+        result = _resolve_secret("${SECRET_KEY}")
+        assert result == "my-secret-key"
+
+    def test_raises_error_for_missing_env_variable(self) -> None:
+        """Test that VariableResolutionError is raised for missing env variable."""
+        with pytest.raises(VariableResolutionError) as exc_info:
+            _resolve_secret("${env:NONEXISTENT_VAR}")
+        assert "NONEXISTENT_VAR" in str(exc_info.value)
+
+    def test_raises_error_with_logging(self, caplog) -> None:
+        """Test that warning is logged before raising error."""
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            with pytest.raises(VariableResolutionError):
+                _resolve_secret("${env:MISSING_SECRET}")
+        assert "Failed to resolve secret template" in caplog.text
+        assert "${env:MISSING_SECRET}" in caplog.text
+
+    def test_raises_error_for_unsupported_prefix(self) -> None:
+        """Test that VariableResolutionError is raised for unsupported prefixes."""
+        with pytest.raises(VariableResolutionError) as exc_info:
+            _resolve_secret("${unsupported:VAR}")
+        assert "unsupported" in str(exc_info.value)
