@@ -178,12 +178,12 @@ def _extract_role_and_instructions(
 
         # Check for heading
         if stripped.startswith("# "):
-            heading = stripped[2:].lower()
-            if heading.startswith("role"):
+            heading = stripped[2:].strip().lower()
+            if heading == "role":
                 in_role = True
                 in_instructions = False
                 continue
-            elif heading.startswith("instructions"):
+            elif heading == "instructions":
                 in_role = False
                 in_instructions = True
                 continue

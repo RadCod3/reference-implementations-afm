@@ -220,6 +220,77 @@ Line 2 of instructions.
         assert "Line 1 of instructions." in result.instructions
         assert "Line 2 of instructions." in result.instructions
 
+    def test_role_heading_exact_match_only(self) -> None:
+        """Test that only exact 'Role' heading triggers role detection."""
+        content = """---
+spec_version: "0.3.0"
+---
+
+# Roleplay
+This should NOT be parsed as role.
+
+# Role
+This is the actual role.
+
+# Instructions
+These are instructions.
+"""
+        result = parse_afm(content)
+        assert "Roleplay" not in result.role
+        assert "This should NOT be parsed as role." not in result.role
+        assert result.role == "This is the actual role."
+
+    def test_instructions_heading_exact_match_only(self) -> None:
+        """Test that only exact 'Instructions' heading triggers instructions detection."""
+        content = """---
+spec_version: "0.3.0"
+---
+
+# Role
+This is the role.
+
+# Instructions for developers
+This should NOT be parsed as instructions.
+
+# Instructions
+These are the actual instructions.
+"""
+        result = parse_afm(content)
+        assert "for developers" not in result.instructions
+        assert "This should NOT be parsed as instructions." not in result.instructions
+        assert result.instructions == "These are the actual instructions."
+
+    def test_role_heading_with_trailing_whitespace(self) -> None:
+        """Test that role heading with trailing whitespace is still recognized."""
+        content = """---
+spec_version: "0.3.0"
+---
+
+# Role  
+This is the role with trailing spaces.
+
+# Instructions
+These are instructions.
+"""
+        result = parse_afm(content)
+        assert result.role == "This is the role with trailing spaces."
+
+    def test_case_insensitive_headings(self) -> None:
+        """Test that headings are case-insensitive."""
+        content = """---
+spec_version: "0.3.0"
+---
+
+# ROLE
+This is the role.
+
+# INSTRUCTIONS
+These are the instructions.
+"""
+        result = parse_afm(content)
+        assert result.role == "This is the role."
+        assert result.instructions == "These are the instructions."
+
 
 class TestParseAfmFile:
     """Tests for the parse_afm_file function."""
