@@ -1,0 +1,60 @@
+/* Main layout */
+Screen {
+    layout: vertical;
+}
+
+/* Header area */
+Header {
+    dock: top;
+    height: 3;
+    content-align: center middle;
+    background: $primary;
+    color: $text;
+}
+
+/* Chat log area */
+#chat-log {
+    height: 1fr;
+    border: solid $secondary;
+    padding: 1;
+    overflow-y: auto;
+    scrollbar-size: 1 1;
+}
+
+/* Input area */
+#chat-input {
+    dock: bottom;
+    height: 3;
+    margin: 1 0;
+    border: tall $accent;
+}
+
+/* Message styles */
+.user {
+    color: $text;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.agent {
+    color: $success;
+    margin-bottom: 1;
+}
+
+.system {
+    color: $secondary;
+    text-style: italic;
+    margin-bottom: 1;
+}
+
+.error {
+    color: $error;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.thinking {
+    color: $warning-lighten-2;
+    text-style: italic;
+    margin-bottom: 1;
+}

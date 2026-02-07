@@ -44,6 +44,7 @@ from .exceptions import (
 )
 from .interfaces import (
     WebSubSubscriber,
+    ChatApp,
     async_run_console_chat,
     create_webchat_app,
     create_webhook_app,
@@ -205,6 +206,7 @@ __all__ = [
     "get_primary_interface",
     "has_interface_type",
     "get_http_path",
+    "ChatApp",
     "run_console_chat",
     "async_run_console_chat",
     "create_webchat_app",
