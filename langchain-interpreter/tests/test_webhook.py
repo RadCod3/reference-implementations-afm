@@ -13,21 +13,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from langchain_interpreter import (
+from afm_cli import (
     JSONSchema,
     Signature,
     Subscription,
     WebhookInterface,
 )
-from langchain_interpreter.agent import Agent
-from langchain_interpreter.exceptions import VariableResolutionError
-from langchain_interpreter.interfaces.webhook import (
+from afm_cli.agent import Agent
+from afm_cli.exceptions import VariableResolutionError
+from afm_cli.interfaces.webhook import (
     WebSubSubscriber,
-    _resolve_secret,
     create_webhook_app,
+    resolve_secret,
     verify_webhook_signature,
 )
-from langchain_interpreter.models import Exposure, HTTPExposure
+from afm_cli.models import Exposure, HTTPExposure
 
 
 @pytest.fixture
@@ -445,7 +445,7 @@ class TestWebSubVerification:
             auto_subscribe=False,  # Disable auto-subscribe for testing
         )
         # Manually set up subscriber for testing
-        from langchain_interpreter.interfaces.webhook import WebSubSubscriber
+        from afm_cli.interfaces.webhook import WebSubSubscriber
 
         app.state.websub_subscriber = WebSubSubscriber(
             hub="https://hub.example.com",
@@ -475,7 +475,7 @@ class TestWebSubVerification:
             mock_webhook_agent,
             auto_subscribe=False,
         )
-        from langchain_interpreter.interfaces.webhook import WebSubSubscriber
+        from afm_cli.interfaces.webhook import WebSubSubscriber
 
         app.state.websub_subscriber = WebSubSubscriber(
             hub="https://hub.example.com",
@@ -647,40 +647,40 @@ class TestWebSubSubscriberAsync:
 
 
 class TestResolveSecret:
-    """Tests for _resolve_secret function."""
+    """Tests for resolve_secret function."""
 
     def test_returns_none_for_none(self) -> None:
         """Test that None returns None."""
-        result = _resolve_secret(None)
+        result = resolve_secret(None)
         assert result is None
 
     def test_returns_none_for_empty_string(self) -> None:
         """Test that empty string returns None."""
-        result = _resolve_secret("")
+        result = resolve_secret("")
         assert result is None
 
     def test_returns_secret_without_variables(self) -> None:
         """Test that secrets without variables are returned as-is."""
         secret = "my-plain-secret"
-        result = _resolve_secret(secret)
+        result = resolve_secret(secret)
         assert result == secret
 
     def test_resolves_env_variable(self, monkeypatch) -> None:
         """Test that ${env:VAR} is properly resolved."""
         monkeypatch.setenv("WEBHOOK_SECRET", "resolved-secret-value")
-        result = _resolve_secret("${env:WEBHOOK_SECRET}")
+        result = resolve_secret("${env:WEBHOOK_SECRET}")
         assert result == "resolved-secret-value"
 
     def test_resolves_env_variable_without_prefix(self, monkeypatch) -> None:
         """Test that ${VAR} is properly resolved (no env: prefix)."""
         monkeypatch.setenv("SECRET_KEY", "my-secret-key")
-        result = _resolve_secret("${SECRET_KEY}")
+        result = resolve_secret("${SECRET_KEY}")
         assert result == "my-secret-key"
 
     def test_raises_error_for_missing_env_variable(self) -> None:
         """Test that VariableResolutionError is raised for missing env variable."""
         with pytest.raises(VariableResolutionError) as exc_info:
-            _resolve_secret("${env:NONEXISTENT_VAR}")
+            resolve_secret("${env:NONEXISTENT_VAR}")
         assert "NONEXISTENT_VAR" in str(exc_info.value)
 
     def test_raises_error_with_logging(self, caplog) -> None:
@@ -689,12 +689,12 @@ class TestResolveSecret:
 
         with caplog.at_level(logging.WARNING):
             with pytest.raises(VariableResolutionError):
-                _resolve_secret("${env:MISSING_SECRET}")
+                resolve_secret("${env:MISSING_SECRET}")
         assert "Failed to resolve secret template" in caplog.text
         assert "${env:MISSING_SECRET}" in caplog.text
 
     def test_raises_error_for_unsupported_prefix(self) -> None:
         """Test that VariableResolutionError is raised for unsupported prefixes."""
         with pytest.raises(VariableResolutionError) as exc_info:
-            _resolve_secret("${unsupported:VAR}")
+            resolve_secret("${unsupported:VAR}")
         assert "unsupported" in str(exc_info.value)

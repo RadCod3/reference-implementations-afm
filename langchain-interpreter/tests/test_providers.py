@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from langchain_interpreter.exceptions import ProviderError
-from langchain_interpreter.models import ClientAuthentication, Model
-from langchain_interpreter.providers import (
+from afm_cli.exceptions import ProviderError
+from afm_cli.models import ClientAuthentication, Model
+from afm_cli.providers import (
     ANTHROPIC_API_KEY_ENV,
     DEFAULT_ANTHROPIC_MODEL,
     DEFAULT_OPENAI_MODEL,

@@ -13,8 +13,8 @@ This package provides:
 
 Example usage::
 
-    from langchain_interpreter import parse_afm_file, Agent
-    from langchain_interpreter.interfaces import run_console_chat
+    from afm_cli import parse_afm_file, Agent
+    from afm_cli.interfaces import run_console_chat
 
     afm = parse_afm_file("my_agent.afm.md")
     agent = Agent(afm)

@@ -6,7 +6,7 @@
 import pytest
 from pydantic import ValidationError
 
-from langchain_interpreter import (
+from afm_cli import (
     AgentMetadata,
     ClientAuthentication,
     ConsoleChatInterface,

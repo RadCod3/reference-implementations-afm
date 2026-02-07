@@ -5,7 +5,7 @@
 
 import pytest
 
-from langchain_interpreter import (
+from afm_cli import (
     AFMValidationError,
     VariableResolutionError,
     WebhookInterface,

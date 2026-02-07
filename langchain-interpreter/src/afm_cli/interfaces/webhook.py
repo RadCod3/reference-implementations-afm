@@ -465,8 +465,8 @@ def create_webhook_app(
         A FastAPI application instance.
 
     Example:
-        >>> from langchain_interpreter import parse_afm_file, Agent
-        >>> from langchain_interpreter.interfaces import create_webhook_app
+        >>> from afm_cli import parse_afm_file, Agent
+        >>> from afm_cli.interfaces import create_webhook_app
         >>> import uvicorn
         >>> afm = parse_afm_file("webhook_agent.afm.md")
         >>> agent = Agent(afm)
@@ -642,8 +642,8 @@ def run_webhook_server(
         log_level: Uvicorn log level. Defaults to "info".
 
     Example:
-        >>> from langchain_interpreter import parse_afm_file, Agent
-        >>> from langchain_interpreter.interfaces import run_webhook_server
+        >>> from afm_cli import parse_afm_file, Agent
+        >>> from afm_cli.interfaces import run_webhook_server
         >>> afm = parse_afm_file("webhook_agent.afm.md")
         >>> agent = Agent(afm)
         >>> run_webhook_server(agent, port=8080)

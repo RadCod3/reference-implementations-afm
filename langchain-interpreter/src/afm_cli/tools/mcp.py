@@ -7,8 +7,8 @@ This module provides classes for connecting to MCP servers and exposing their
 tools to LangChain-based agents.
 
 Example:
-    >>> from langchain_interpreter import parse_afm_file
-    >>> from langchain_interpreter.tools import MCPManager
+    >>> from afm_cli import parse_afm_file
+    >>> from afm_cli.tools import MCPManager
     >>>
     >>> afm = parse_afm_file("agent_with_tools.afm.md")
     >>> manager = MCPManager.from_afm(afm)

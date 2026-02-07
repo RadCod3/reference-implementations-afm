@@ -9,20 +9,20 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from langchain_interpreter.cli import (
+from afm_cli.cli import (
     __cli_version__,
     create_unified_app,
     extract_interfaces,
     format_validation_output,
     main,
 )
-from langchain_interpreter.models import (
+from afm_cli.models import (
     ConsoleChatInterface,
     WebChatInterface,
     WebhookInterface,
     Subscription,
 )
-from langchain_interpreter.parser import parse_afm_file
+from afm_cli.parser import parse_afm_file
 
 
 # =============================================================================
@@ -229,11 +229,9 @@ class TestCreateUnifiedApp:
         with patch.object(
             afm.metadata, "model", MagicMock(provider="openai", name="gpt-4")
         ):
-            from langchain_interpreter import Agent
+            from afm_cli import Agent
 
-            with patch(
-                "langchain_interpreter.agent.create_model_provider"
-            ) as mock_provider:
+            with patch("afm_cli.agent.create_model_provider") as mock_provider:
                 mock_provider.return_value = MagicMock()
                 agent = Agent(afm)
 
@@ -244,12 +242,10 @@ class TestCreateUnifiedApp:
         """Test creating app with webchat interface."""
         afm = parse_afm_file(str(sample_agent_path))
 
-        with patch(
-            "langchain_interpreter.agent.create_model_provider"
-        ) as mock_provider:
+        with patch("afm_cli.agent.create_model_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
 
-            from langchain_interpreter import Agent
+            from afm_cli import Agent
 
             agent = Agent(afm)
             webchat = WebChatInterface()
@@ -269,12 +265,10 @@ class TestCreateUnifiedApp:
         """Test creating app with webhook interface."""
         afm = parse_afm_file(str(sample_minimal_path))
 
-        with patch(
-            "langchain_interpreter.agent.create_model_provider"
-        ) as mock_provider:
+        with patch("afm_cli.agent.create_model_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
 
-            from langchain_interpreter import Agent
+            from afm_cli import Agent
 
             agent = Agent(afm)
             webhook = WebhookInterface(
@@ -296,12 +290,10 @@ class TestCreateUnifiedApp:
         """Test creating app with both webchat and webhook."""
         afm = parse_afm_file(str(sample_minimal_path))
 
-        with patch(
-            "langchain_interpreter.agent.create_model_provider"
-        ) as mock_provider:
+        with patch("afm_cli.agent.create_model_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
 
-            from langchain_interpreter import Agent
+            from afm_cli import Agent
 
             agent = Agent(afm)
             webchat = WebChatInterface()
@@ -368,8 +360,8 @@ class TestCLIIntegration:
         assert result.exit_code == 0
         assert "TestAgent" in result.output
 
-    @patch("langchain_interpreter.cli.uvicorn")
-    @patch("langchain_interpreter.cli.Agent")
+    @patch("afm_cli.cli.uvicorn")
+    @patch("afm_cli.cli.Agent")
     def test_cli_starts_http_server_for_webchat(
         self,
         mock_agent_class: MagicMock,

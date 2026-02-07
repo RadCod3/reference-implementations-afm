@@ -14,8 +14,8 @@ Example usage:
 
     Console Chat::
 
-        from langchain_interpreter import parse_afm_file, Agent
-        from langchain_interpreter.interfaces import run_console_chat
+        from afm_cli import parse_afm_file, Agent
+        from afm_cli.interfaces import run_console_chat
 
         afm = parse_afm_file("my_agent.afm.md")
         agent = Agent(afm)
@@ -23,8 +23,8 @@ Example usage:
 
     Web Chat::
 
-        from langchain_interpreter import parse_afm_file, Agent
-        from langchain_interpreter.interfaces import create_webchat_app
+        from afm_cli import parse_afm_file, Agent
+        from afm_cli.interfaces import create_webchat_app
         import uvicorn
 
         afm = parse_afm_file("my_agent.afm.md")
@@ -34,8 +34,8 @@ Example usage:
 
     Webhook::
 
-        from langchain_interpreter import parse_afm_file, Agent
-        from langchain_interpreter.interfaces import create_webhook_app
+        from afm_cli import parse_afm_file, Agent
+        from afm_cli.interfaces import create_webhook_app
         import uvicorn
 
         afm = parse_afm_file("webhook_agent.afm.md")

@@ -9,7 +9,7 @@ import httpx
 import pytest
 from langchain_core.tools import BaseTool
 
-from langchain_interpreter import (
+from afm_cli import (
     AFMRecord,
     AgentMetadata,
     ClientAuthentication,
@@ -25,7 +25,7 @@ from langchain_interpreter import (
     build_auth_headers,
     filter_tools,
 )
-from langchain_interpreter.tools.mcp import (
+from afm_cli.tools.mcp import (
     ApiKeyAuth,
     BearerAuth,
     build_httpx_auth,
@@ -397,9 +397,7 @@ class TestMCPClient:
 
         mock_tools = [make_mock_tool("tool1"), make_mock_tool("tool2")]
 
-        with patch(
-            "langchain_interpreter.tools.mcp.MultiServerMCPClient"
-        ) as MockClient:
+        with patch("afm_cli.tools.mcp.MultiServerMCPClient") as MockClient:
             mock_instance = AsyncMock()
             mock_instance.get_tools.return_value = mock_tools
             MockClient.return_value = mock_instance
@@ -421,9 +419,7 @@ class TestMCPClient:
 
         mock_tools = [make_mock_tool("tool1"), make_mock_tool("tool2")]
 
-        with patch(
-            "langchain_interpreter.tools.mcp.MultiServerMCPClient"
-        ) as MockClient:
+        with patch("afm_cli.tools.mcp.MultiServerMCPClient") as MockClient:
             mock_instance = AsyncMock()
             mock_instance.get_tools.return_value = mock_tools
             MockClient.return_value = mock_instance
@@ -441,9 +437,7 @@ class TestMCPClient:
             url="http://localhost:8080/mcp",
         )
 
-        with patch(
-            "langchain_interpreter.tools.mcp.MultiServerMCPClient"
-        ) as MockClient:
+        with patch("afm_cli.tools.mcp.MultiServerMCPClient") as MockClient:
             mock_instance = AsyncMock()
             mock_instance.get_tools.side_effect = Exception("Connection refused")
             MockClient.return_value = mock_instance
@@ -655,21 +649,17 @@ class TestAgentMCPIntegration:
         servers = [make_mcp_server(name="test")]
         afm = make_afm_with_mcp(servers)
 
-        with patch(
-            "langchain_interpreter.agent.create_model_provider"
-        ) as mock_provider:
+        with patch("afm_cli.agent.create_model_provider") as mock_provider:
             mock_model = MagicMock()
             mock_model.bind_tools = MagicMock(return_value=mock_model)
             mock_provider.return_value = mock_model
 
-            with patch(
-                "langchain_interpreter.tools.mcp.MultiServerMCPClient"
-            ) as MockClient:
+            with patch("afm_cli.tools.mcp.MultiServerMCPClient") as MockClient:
                 mock_instance = AsyncMock()
                 mock_instance.get_tools.return_value = [make_mock_tool("tool1")]
                 MockClient.return_value = mock_instance
 
-                from langchain_interpreter import Agent
+                from afm_cli import Agent
 
                 agent = Agent(afm)
 
@@ -691,13 +681,11 @@ class TestAgentMCPIntegration:
             instructions="Instructions",
         )
 
-        with patch(
-            "langchain_interpreter.agent.create_model_provider"
-        ) as mock_provider:
+        with patch("afm_cli.agent.create_model_provider") as mock_provider:
             mock_model = MagicMock()
             mock_provider.return_value = mock_model
 
-            from langchain_interpreter import Agent
+            from afm_cli import Agent
 
             agent = Agent(afm)
 
@@ -713,9 +701,7 @@ class TestAgentMCPIntegration:
         servers = [make_mcp_server(name="test")]
         afm = make_afm_with_mcp(servers)
 
-        with patch(
-            "langchain_interpreter.agent.create_model_provider"
-        ) as mock_provider:
+        with patch("afm_cli.agent.create_model_provider") as mock_provider:
             mock_model = MagicMock()
             mock_bound_model = MagicMock()
             mock_model.bind_tools = MagicMock(return_value=mock_bound_model)
@@ -723,14 +709,12 @@ class TestAgentMCPIntegration:
 
             mock_tools = [make_mock_tool("tool1")]
 
-            with patch(
-                "langchain_interpreter.tools.mcp.MultiServerMCPClient"
-            ) as MockClient:
+            with patch("afm_cli.tools.mcp.MultiServerMCPClient") as MockClient:
                 mock_instance = AsyncMock()
                 mock_instance.get_tools.return_value = mock_tools
                 MockClient.return_value = mock_instance
 
-                from langchain_interpreter import Agent
+                from afm_cli import Agent
 
                 agent = Agent(afm)
                 await agent.connect()
@@ -746,13 +730,11 @@ class TestAgentMCPIntegration:
             instructions="Instructions",
         )
 
-        with patch(
-            "langchain_interpreter.agent.create_model_provider"
-        ) as mock_provider:
+        with patch("afm_cli.agent.create_model_provider") as mock_provider:
             mock_model = MagicMock()
             mock_provider.return_value = mock_model
 
-            from langchain_interpreter import Agent
+            from afm_cli import Agent
 
             external_tool = make_mock_tool("external_tool")
             agent = Agent(afm, tools=[external_tool])

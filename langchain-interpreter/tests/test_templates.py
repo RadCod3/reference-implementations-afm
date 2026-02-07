@@ -5,7 +5,7 @@
 
 import pytest
 
-from langchain_interpreter import (
+from afm_cli import (
     CompiledTemplate,
     HeaderVariable,
     JSONAccessError,
@@ -17,7 +17,7 @@ from langchain_interpreter import (
     compile_template,
     evaluate_template,
 )
-from langchain_interpreter.templates import _handle_dot_notation
+from afm_cli.templates import _handle_dot_notation
 
 
 class TestCompileTemplate:

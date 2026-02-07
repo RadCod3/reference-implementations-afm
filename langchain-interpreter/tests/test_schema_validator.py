@@ -5,9 +5,9 @@
 
 import pytest
 
-from langchain_interpreter.exceptions import InputValidationError, OutputValidationError
-from langchain_interpreter.models import JSONSchema
-from langchain_interpreter.schema_validator import (
+from afm_cli.exceptions import InputValidationError, OutputValidationError
+from afm_cli.models import JSONSchema
+from afm_cli.schema_validator import (
     build_output_schema_instruction,
     coerce_output_to_schema,
     extract_json_from_response,

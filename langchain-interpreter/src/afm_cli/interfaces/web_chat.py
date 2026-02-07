@@ -316,8 +316,8 @@ def create_webchat_app(
         A FastAPI application instance.
 
     Example:
-        >>> from langchain_interpreter import parse_afm_file, Agent
-        >>> from langchain_interpreter.interfaces import create_webchat_app
+        >>> from afm_cli import parse_afm_file, Agent
+        >>> from afm_cli.interfaces import create_webchat_app
         >>> import uvicorn
         >>> afm = parse_afm_file("my_agent.afm.md")
         >>> agent = Agent(afm)
@@ -405,8 +405,8 @@ def run_webchat_server(
         log_level: Uvicorn log level. Defaults to "info".
 
     Example:
-        >>> from langchain_interpreter import parse_afm_file, Agent
-        >>> from langchain_interpreter.interfaces import run_webchat_server
+        >>> from afm_cli import parse_afm_file, Agent
+        >>> from afm_cli.interfaces import run_webchat_server
         >>> afm = parse_afm_file("my_agent.afm.md")
         >>> agent = Agent(afm)
         >>> run_webchat_server(agent, port=8080)

@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock, patch
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel
-from langchain_interpreter.agent import Agent
-from langchain_interpreter.models import AFMRecord, AgentMetadata
+from afm_cli.agent import Agent
+from afm_cli.models import AFMRecord, AgentMetadata
 
 
 def test_fix_tools_for_openai_with_dict_schema():
@@ -25,7 +25,7 @@ def test_fix_tools_for_openai_with_dict_schema():
     )
 
     # Mock model provider to avoid actual provider creation
-    with patch("langchain_interpreter.agent.create_model_provider") as mock_provider:
+    with patch("afm_cli.agent.create_model_provider") as mock_provider:
         mock_model = MagicMock()
         mock_model.bind_tools = MagicMock(return_value=mock_model)
         mock_provider.return_value = mock_model
@@ -49,7 +49,7 @@ def test_fix_tools_for_openai_with_no_schema():
         metadata=AgentMetadata(name="Test"), role="Role", instructions="Instructions"
     )
 
-    with patch("langchain_interpreter.agent.create_model_provider") as mock_provider:
+    with patch("afm_cli.agent.create_model_provider") as mock_provider:
         mock_model = MagicMock()
         mock_provider.return_value = mock_model
 
@@ -80,7 +80,7 @@ def test_fix_tools_for_openai_preserves_existing_properties():
         metadata=AgentMetadata(name="Test"), role="Role", instructions="Instructions"
     )
 
-    with patch("langchain_interpreter.agent.create_model_provider") as mock_provider:
+    with patch("afm_cli.agent.create_model_provider") as mock_provider:
         mock_model = MagicMock()
         mock_provider.return_value = mock_model
 

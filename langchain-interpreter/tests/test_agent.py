@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from langchain_interpreter.agent import Agent
-from langchain_interpreter.exceptions import (
+from afm_cli.agent import Agent
+from afm_cli.exceptions import (
     AgentError,
     InputValidationError,
     OutputValidationError,
 )
-from langchain_interpreter.models import (
+from afm_cli.models import (
     AFMRecord,
     AgentMetadata,
     ConsoleChatInterface,
@@ -478,7 +478,7 @@ class TestSessionManagement:
 class TestModelProviderIntegration:
     """Tests for model provider integration."""
 
-    @patch("langchain_interpreter.agent.create_model_provider")
+    @patch("afm_cli.agent.create_model_provider")
     def test_creates_model_from_afm_config(
         self,
         mock_create_provider: MagicMock,
@@ -505,6 +505,6 @@ class TestModelProviderIntegration:
         mock_chat_model: MagicMock,
     ) -> None:
         """Test that provided model is used instead of creating one."""
-        with patch("langchain_interpreter.agent.create_model_provider") as mock_create:
+        with patch("afm_cli.agent.create_model_provider") as mock_create:
             Agent(simple_afm, model=mock_chat_model)
             mock_create.assert_not_called()

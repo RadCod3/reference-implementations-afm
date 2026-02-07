@@ -10,13 +10,13 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from langchain_interpreter import (
+from afm_cli import (
     JSONSchema,
     Signature,
     WebChatInterface,
 )
-from langchain_interpreter.agent import Agent
-from langchain_interpreter.interfaces.web_chat import create_webchat_app
+from afm_cli.agent import Agent
+from afm_cli.interfaces.web_chat import create_webchat_app
 
 
 @pytest.fixture
@@ -89,7 +89,7 @@ def mock_agent_with_webchat_interface() -> MagicMock:
     agent.afm.metadata.icon_url = None
 
     # Configure webchat interface with custom path
-    from langchain_interpreter.models import Exposure, HTTPExposure
+    from afm_cli.models import Exposure, HTTPExposure
 
     interface = WebChatInterface(
         type="webchat",

@@ -12,8 +12,8 @@ from textual.containers import VerticalScroll
 from textual.pilot import Pilot
 from textual.widgets import Input, Static
 
-from langchain_interpreter.agent import Agent
-from langchain_interpreter.interfaces.console_chat import (
+from afm_cli.agent import Agent
+from afm_cli.interfaces.console_chat import (
     ChatApp,
     async_run_console_chat,
     run_console_chat,
@@ -79,7 +79,7 @@ async def test_user_message_flow(mock_agent: MagicMock) -> None:
 @pytest.mark.asyncio
 async def test_run_console_chat(mock_agent: MagicMock) -> None:
     """Test wrapper function."""
-    with patch("langchain_interpreter.interfaces.console_chat.ChatApp") as MockApp:
+    with patch("afm_cli.interfaces.console_chat.ChatApp") as MockApp:
         run_console_chat(
             mock_agent,
             session_id="test-session",
@@ -94,7 +94,7 @@ async def test_run_console_chat(mock_agent: MagicMock) -> None:
 @pytest.mark.asyncio
 async def test_async_run_console_chat(mock_agent: MagicMock) -> None:
     """Test async wrapper function."""
-    with patch("langchain_interpreter.interfaces.console_chat.ChatApp") as MockApp:
+    with patch("afm_cli.interfaces.console_chat.ChatApp") as MockApp:
         # Mock run_async
         MockApp.return_value.run_async = AsyncMock()
 

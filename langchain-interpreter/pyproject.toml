@@ -1,12 +1,17 @@
 [project]
-name = "langchain-interpreter"
+name = "afm-cli"
 version = "0.1.0"
 description = "AFM (Agent-Flavored Markdown) interpreter using LangChain"
 readme = "README.md"
-authors = [
-    { name = "Radith Samarakoon", email = "jjeli1234@gmail.com" }
+authors = [{ name = "Radith Samarakoon", email = "jjeli1234@gmail.com" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.11",
 ]
 requires-python = ">=3.11"
+urls = { Repository = "https://github.com/RadCod3/reference-implementations-afm" }
 dependencies = [
     "langchain>=1.2.8",
     "pyyaml>=6.0",
@@ -24,7 +29,7 @@ dependencies = [
 ]
 
 [project.scripts]
-afm = "langchain_interpreter.cli:main"
+afm = "afm_cli.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.9.28,<0.10.0"]

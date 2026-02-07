@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from langchain_interpreter import (
+from afm_cli import (
     AFMParseError,
     AFMValidationError,
     ConsoleChatInterface,
