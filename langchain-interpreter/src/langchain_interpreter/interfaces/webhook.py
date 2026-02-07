@@ -315,7 +315,7 @@ def create_webhook_router(
 
     # Get subscription configuration
     subscription = interface.subscription
-    secret = _resolve_secret(subscription.secret)
+    secret = resolve_secret(subscription.secret)
 
     # WebSub verification endpoint
     @router.get(path)
@@ -399,6 +399,7 @@ def create_webhook_router(
         try:
             # Run the agent
             response = await agent.arun(user_prompt)
+            logger.debug(f"Agent response: {response}")
 
             # Format response based on output schema
             if output_is_string:
@@ -484,7 +485,7 @@ def create_webhook_app(
 
     # Get subscription configuration for WebSub
     subscription = interface.subscription
-    secret = _resolve_secret(subscription.secret)
+    secret = resolve_secret(subscription.secret)
 
     # Set up WebSub subscriber if configured
     websub_subscriber: WebSubSubscriber | None = None
@@ -504,9 +505,9 @@ def create_webhook_app(
         if websub_subscriber:
             # Run subscription in background to not block startup
             subscription_task = asyncio.create_task(
-                _subscribe_with_retry(websub_subscriber)
+                subscribe_with_retry(websub_subscriber)
             )
-            subscription_task.add_done_callback(_log_task_exception)
+            subscription_task.add_done_callback(log_task_exception)
             app.state.subscription_task = subscription_task
         yield
         # Shutdown: Unsubscribe from WebSub hub
@@ -549,7 +550,7 @@ def create_webhook_app(
     return app
 
 
-async def _subscribe_with_retry(
+async def subscribe_with_retry(
     subscriber: WebSubSubscriber,
     max_retries: int = 3,
     retry_delay: float = 5.0,
@@ -575,7 +576,7 @@ async def _subscribe_with_retry(
     logger.error(f"Failed to subscribe to WebSub after {max_retries} attempts")
 
 
-def _log_task_exception(task: asyncio.Task) -> None:
+def log_task_exception(task: asyncio.Task) -> None:
     """Log any exception from an asyncio task.
 
     This callback is used to ensure background tasks don't silently swallow
@@ -591,7 +592,7 @@ def _log_task_exception(task: asyncio.Task) -> None:
         )
 
 
-def _resolve_secret(secret: str | None) -> str | None:
+def resolve_secret(secret: str | None) -> str | None:
     """Resolve a secret value, handling environment variable substitution.
 
     Args:

@@ -34,7 +34,13 @@ from .exceptions import AFMError
 from .interfaces.base import get_http_path, get_interfaces
 from .interfaces.console_chat import async_run_console_chat
 from .interfaces.web_chat import create_webchat_router
-from .interfaces.webhook import create_webhook_router
+from .interfaces.webhook import (
+    WebSubSubscriber,
+    create_webhook_router,
+    log_task_exception,
+    resolve_secret,
+    subscribe_with_retry,
+)
 from .models import (
     ConsoleChatInterface,
     WebChatInterface,
@@ -60,6 +66,8 @@ def create_unified_app(
     webhook_interface: WebhookInterface | None = None,
     cors_origins: list[str] | None = None,
     startup_event: asyncio.Event | None = None,
+    host: str = "0.0.0.0",
+    port: int = 8000,
 ) -> FastAPI:
     """Create a unified FastAPI app that serves multiple interface types.
 
@@ -85,15 +93,49 @@ def create_unified_app(
     if webchat_interface is None and webhook_interface is None:
         raise ValueError("At least one HTTP interface must be provided")
 
-    # Create lifespan for MCP connection management
+    # Set up WebSub subscriber if configured
+    websub_subscriber: WebSubSubscriber | None = None
+    secret: str | None = None
+
+    if webhook_interface is not None:
+        subscription = webhook_interface.subscription
+        secret = resolve_secret(subscription.secret)
+
+        if subscription.hub and subscription.topic:
+            webhook_path = get_http_path(webhook_interface)
+            callback_url = (
+                subscription.callback or f"http://{host}:{port}{webhook_path}"
+            )
+            websub_subscriber = WebSubSubscriber(
+                hub=subscription.hub,
+                topic=subscription.topic,
+                callback=callback_url,
+                secret=secret,
+            )
+
+    # Create lifespan for MCP connection management and WebSub
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Connect MCP servers on startup
         await agent.connect()
+
+        # Startup: Subscribe to WebSub hub
+        if websub_subscriber:
+            # Run subscription in background
+            subscription_task = asyncio.create_task(
+                subscribe_with_retry(websub_subscriber)
+            )
+            subscription_task.add_done_callback(log_task_exception)
+            app.state.subscription_task = subscription_task
+
         # Signal that startup is complete if an event was provided
         if startup_event is not None:
             startup_event.set()
         yield
+        # Shutdown: Unsubscribe from WebSub hub
+        if websub_subscriber and websub_subscriber.is_verified:
+            await websub_subscriber.unsubscribe()
+
         # Disconnect MCP servers on shutdown
         await agent.disconnect()
 
@@ -163,6 +205,9 @@ def create_unified_app(
             webhook_path,  # type: ignore[arg-type]
         )
         app.include_router(webhook_router)
+        # Store subscriber in app state for verification endpoint
+        app.state.websub_subscriber = websub_subscriber
+        app.state.secret = secret
 
     return app
 
@@ -438,6 +483,8 @@ async def _run_http_and_console(
         webchat_interface=webchat,
         webhook_interface=webhook,
         startup_event=startup_event,
+        host=host,
+        port=port,
     )
 
     # Configure uvicorn
@@ -518,6 +565,8 @@ def _run_http_only(
         agent,
         webchat_interface=webchat,
         webhook_interface=webhook,
+        host=host,
+        port=port,
     )
 
     # Run uvicorn (blocking)
