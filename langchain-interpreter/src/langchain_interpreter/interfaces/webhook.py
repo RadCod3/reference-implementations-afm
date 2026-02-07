@@ -376,11 +376,11 @@ def create_webhook_router(
         try:
             # Parse payload
             payload = json.loads(body)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid JSON payload",
-            )
+            ) from e
 
         # Get headers as dict (cast to expected type)
         headers: dict[str, str | list[str]] = dict(request.headers)
@@ -393,7 +393,7 @@ def create_webhook_router(
                 raise HTTPException(
                     status_code=400,
                     detail=str(e),
-                )
+                ) from e
         else:
             # Default: stringify the payload
             user_prompt = json.dumps(payload, indent=2)
@@ -419,11 +419,11 @@ def create_webhook_router(
                     return JSONResponse(content={"result": response})
 
         except Exception as e:
-            logger.error(f"Agent execution error: {e}")
+            logger.exception("Agent execution error")
             raise HTTPException(
                 status_code=500,
-                detail=str(e),
-            )
+                detail="Internal server error",
+            ) from e
 
     return router
 
@@ -478,11 +478,11 @@ def create_webhook_app(
     try:
         interface = get_webhook_interface(agent.afm)
         webhook_path = path or get_http_path(interface)
-    except InterfaceNotFoundError:
+    except InterfaceNotFoundError as e:
         raise ValueError(
             "Agent must have a webhook interface to create a webhook app. "
             "Add a webhook interface to the agent's metadata."
-        )
+        ) from e
 
     # Get subscription configuration for WebSub
     subscription = interface.subscription

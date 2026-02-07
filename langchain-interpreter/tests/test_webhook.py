@@ -411,7 +411,7 @@ class TestCreateWebhookApp:
         )
 
         assert response.status_code == 500
-        assert "Agent failed" in response.json()["detail"]
+        assert "Internal server error" in response.json()["detail"]
 
     def test_webhook_no_secret_skips_verification(
         self, mock_webhook_agent_no_secret: MagicMock
