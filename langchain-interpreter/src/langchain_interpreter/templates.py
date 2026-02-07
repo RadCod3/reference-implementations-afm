@@ -146,7 +146,7 @@ def evaluate_template(
     Args:
         compiled: The compiled template to evaluate.
         payload: The JSON payload from the webhook request.
-        headers: HTTP headers from the webhook request (case-insensitive).
+        headers: HTTP headers from the webhook request.
 
     Returns:
         The evaluated template string.

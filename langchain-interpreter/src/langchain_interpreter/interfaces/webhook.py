@@ -382,9 +382,7 @@ def create_webhook_router(
                 detail="Invalid JSON payload",
             ) from e
 
-        # Get headers as dict (cast to expected type)
-        headers: dict[str, str | list[str]] = dict(request.headers)
-
+        headers = dict(request.headers)
         # Construct user prompt
         if compiled_prompt:
             try:
