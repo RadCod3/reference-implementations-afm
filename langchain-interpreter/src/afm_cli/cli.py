@@ -7,10 +7,10 @@ This module provides the `afm` command for running AFM agents from the terminal.
 It supports multiple interface types and can run them concurrently.
 
 Usage:
-    uv run afm agent.afm.md
-    uv run afm agent.afm.md --port 8080
-    uv run afm agent.afm.md --dry-run
-    uv run afm agent.afm.md --no-console
+    afm agent.afm.md
+    afm agent.afm.md --port 8080
+    afm agent.afm.md --dry-run
+    afm agent.afm.md --no-console
 """
 
 from __future__ import annotations
@@ -385,13 +385,13 @@ def main(
 
     Examples:
 
-        uv run afm agent.afm.md
+        afm agent.afm.md
 
-        uv run afm agent.afm.md --port 8080
+        afm agent.afm.md --port 8080
 
-        uv run afm agent.afm.md --dry-run
+        afm agent.afm.md --dry-run
 
-        uv run afm agent.afm.md --no-console
+        afm agent.afm.md --no-console
     """
     # Configure logging
     log_level = logging.DEBUG if verbose else logging.INFO
