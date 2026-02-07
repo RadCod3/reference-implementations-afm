@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING, Callable, TextIO
+from typing import TYPE_CHECKING
 
 from rich.markup import escape
 from textual import work
 from textual.app import App, ComposeResult
-from textual.containers import VerticalScroll
-from textual.widgets import Footer, Header, Input, Static
+from textual.containers import Vertical, VerticalScroll
+from textual.widgets import Footer, Header, Input, LoadingIndicator, Static
 
 if TYPE_CHECKING:
     from ..agent import Agent
@@ -78,7 +78,7 @@ class ChatApp(App):
             "type 'help' or Ctrl+H for help.\n"
             "type 'clear' or Ctrl+L to clear history."
         )
-        self.query_one("#chat-log").mount(Static(welcome_msg, classes="system"))
+        self.query_one("#chat-log").mount(Static(welcome_msg, classes="system-message"))
         self.query_one("#chat-input").focus()
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -109,7 +109,12 @@ class ChatApp(App):
 
             # Display user message
             chat_log = self.query_one("#chat-log")
-            chat_log.mount(Static(f"You: {escape(user_input)}", classes="user"))
+            msg_widget = Static(f"{escape(user_input)}", classes="message user-message")
+            await chat_log.mount(
+                Vertical(
+                    msg_widget, classes="message-container message-container--user"
+                )
+            )
 
             # Send to agent
             self._send_message(user_input)
@@ -125,7 +130,7 @@ class ChatApp(App):
             chat_log = self.query_one("#chat-log", VerticalScroll)
 
             # Show thinking indicator
-            thinking = Static("[Thinking...]", classes="thinking", markup=False)
+            thinking = LoadingIndicator()
             await chat_log.mount(thinking)
             chat_log.scroll_end(animate=False)
 
@@ -140,8 +145,12 @@ class ChatApp(App):
             # Remove thinking and show response
             await thinking.remove()
             logger.debug(f"Mounting response: '{response}'")
+
+            msg_widget = Static(f"{escape(response)}", classes="message agent-message")
             await chat_log.mount(
-                Static(f"{self.agent_prefix}{escape(response)}", classes="agent")
+                Vertical(
+                    msg_widget, classes="message-container message-container--agent"
+                )
             )
             chat_log.scroll_end(animate=True)
 
@@ -159,7 +168,7 @@ class ChatApp(App):
                     pass
 
                 await chat_log.mount(
-                    Static(f"[Error: {str(e)}]", classes="error", markup=False)
+                    Static(f"[Error: {str(e)}]", classes="error-message", markup=False)
                 )
             except Exception as e2:
                 logger.exception(f"Could not report error to UI: {e2}")
@@ -172,14 +181,16 @@ class ChatApp(App):
             "  help,     Ctrl+H    - Show this help message\n"
             "  clear,    Ctrl+L    - Clear conversation history"
         )
-        self.query_one("#chat-log").mount(Static(help_msg, classes="system"))
+        self.query_one("#chat-log").mount(Static(help_msg, classes="system-message"))
         self.query_one("#chat-log").scroll_end()
 
     def action_clear_history(self) -> None:
         """Clear conversation history."""
         self.agent.clear_history(self.session_id)
         self.query_one("#chat-log").mount(
-            Static("[Conversation history cleared]", classes="system", markup=False)
+            Static(
+                "[Conversation history cleared]", classes="system-message", markup=False
+            )
         )
         self.query_one("#chat-log").scroll_end()
 

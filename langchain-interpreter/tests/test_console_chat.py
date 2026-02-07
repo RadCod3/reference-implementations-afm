@@ -39,12 +39,12 @@ def mock_agent() -> MagicMock:
 async def test_app_starts_with_welcome(mock_agent: MagicMock) -> None:
     """Test that app starts and shows welcome message."""
     app = ChatApp(mock_agent)
-    async with app.run_test() as pilot:
+    async with app.run_test():
         # Check welcome message
         chat_log = app.query_one("#chat-log")
         assert chat_log is not None
 
-        welcome_widget = chat_log.query_one(".system", Static)
+        welcome_widget = chat_log.query_one(".system-message", Static)
         assert "Welcome to chat with Test Agent" in str(welcome_widget.render())
 
 
@@ -63,12 +63,12 @@ async def test_user_message_flow(mock_agent: MagicMock) -> None:
 
         # Check user message
         chat_log = app.query_one("#chat-log", VerticalScroll)
-        user_msgs = chat_log.query(".user")
+        user_msgs = chat_log.query(".user-message")
         assert len(user_msgs) == 1
         assert "Hello!" in str(user_msgs[0].render())
 
         # Check agent response
-        agent_msgs = chat_log.query(".agent")
+        agent_msgs = chat_log.query(".agent-message")
         assert len(agent_msgs) == 1
         assert "Hello! I'm the test agent." in str(agent_msgs[0].render())
 
@@ -97,13 +97,13 @@ async def test_async_run_console_chat(mock_agent: MagicMock) -> None:
     with patch("langchain_interpreter.interfaces.console_chat.ChatApp") as MockApp:
         # Mock run_async
         MockApp.return_value.run_async = AsyncMock()
-        
+
         await async_run_console_chat(
             mock_agent,
             session_id="test-session",
             agent_prefix="Agent: ",
         )
-        
+
         MockApp.assert_called_once_with(
             mock_agent, session_id="test-session", agent_prefix="Agent: "
         )
@@ -123,7 +123,7 @@ async def test_help_command(mock_agent: MagicMock) -> None:
 
         # Check for help message
         chat_log = app.query_one("#chat-log")
-        system_msgs = chat_log.query(".system")
+        system_msgs = chat_log.query(".system-message")
         # Should be welcome + help
         assert len(system_msgs) >= 2
         last_msg = system_msgs[-1]
@@ -143,7 +143,7 @@ async def test_clear_command(mock_agent: MagicMock) -> None:
 
         # Check confirmation
         chat_log = app.query_one("#chat-log")
-        system_msgs = chat_log.query(".system")
+        system_msgs = chat_log.query(".system-message")
         last_msg = system_msgs[-1]
         assert "history cleared" in str(last_msg.render())
 
@@ -174,13 +174,13 @@ async def test_keybindings(mock_agent: MagicMock) -> None:
         await pilot.press("ctrl+h")
         await pilot.pause()
 
-        sys_msgs = app.query(".system")
+        sys_msgs = app.query(".system-message")
         assert "Available commands" in str(sys_msgs[-1].render())
 
         # Ctrl+L for clear
         await pilot.press("ctrl+l")
         await pilot.pause()
-        assert "history cleared" in str(app.query(".system")[-1].render())
+        assert "history cleared" in str(app.query(".system-message")[-1].render())
 
         # Ctrl+Q for quit
         await pilot.press("ctrl+q")
@@ -202,7 +202,7 @@ async def test_agent_error_display(mock_agent: MagicMock) -> None:
         await pilot.pause()
 
         # Check error message
-        errors = app.query(".error")
+        errors = app.query(".error-message")
         assert len(errors) == 1
         assert "Test Error" in str(errors[0].render())
 
@@ -220,5 +220,5 @@ async def test_json_response(mock_agent: MagicMock) -> None:
 
         await pilot.pause()
 
-        agent_msgs = app.query(".agent")
+        agent_msgs = app.query(".agent-message")
         assert '"foo": "bar"' in str(agent_msgs[0].render())
