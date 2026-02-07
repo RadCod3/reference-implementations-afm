@@ -251,7 +251,7 @@ def verify_webhook_signature(
             if algo.lower() in ("sha1", "sha256", "sha512"):
                 algorithm = algo.lower()
             else:
-                provided_sig = signature_header
+                provided_sig = sig_parts[1]
         else:
             provided_sig = signature_header
     else:
