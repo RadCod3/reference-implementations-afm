@@ -10,6 +10,7 @@ to stdout.
 
 from __future__ import annotations
 
+import asyncio
 import sys
 import uuid
 from typing import TYPE_CHECKING, Callable, TextIO
@@ -231,8 +232,8 @@ async def async_run_console_chat(
     """Async version of run_console_chat.
 
     This function uses the agent's async run method (arun) for executing
-    queries. The input/output handling remains synchronous as terminal I/O
-    is inherently blocking.
+    queries. User input is read via run_in_executor to avoid blocking the
+    event loop, making this function safe to use alongside other async tasks.
 
     Args:
         agent: The AFM agent to chat with.
@@ -259,14 +260,17 @@ async def async_run_console_chat(
     if output is None:
         output = sys.stdout
 
+    # Get the event loop once for use in the chat loop
+    loop = asyncio.get_running_loop()
+
     # Print welcome message
     _print_welcome(agent, output)
 
     # Main chat loop
     while True:
         try:
-            # Read user input (blocking)
-            user_input = input_fn(user_prompt)
+            # Read user input in executor to avoid blocking the event loop
+            user_input = await loop.run_in_executor(None, input_fn, user_prompt)
 
             # Handle empty input
             if not user_input.strip():

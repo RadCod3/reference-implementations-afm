@@ -59,6 +59,7 @@ def create_unified_app(
     webchat_interface: WebChatInterface | None = None,
     webhook_interface: WebhookInterface | None = None,
     cors_origins: list[str] | None = None,
+    startup_event: asyncio.Event | None = None,
 ) -> FastAPI:
     """Create a unified FastAPI app that serves multiple interface types.
 
@@ -71,6 +72,9 @@ def create_unified_app(
         webchat_interface: Optional webchat interface configuration.
         webhook_interface: Optional webhook interface configuration.
         cors_origins: Optional list of allowed CORS origins.
+        startup_event: Optional event to signal when MCP connection is complete.
+            Useful for coordinating with other async tasks that need the agent
+            to be connected before proceeding.
 
     Returns:
         A FastAPI application with routes for all configured interfaces.
@@ -86,6 +90,9 @@ def create_unified_app(
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Connect MCP servers on startup
         await agent.connect()
+        # Signal that startup is complete if an event was provided
+        if startup_event is not None:
+            startup_event.set()
         yield
         # Disconnect MCP servers on shutdown
         await agent.disconnect()
@@ -422,11 +429,15 @@ async def _run_http_and_console(
     verbose: bool,
 ) -> None:
     """Run HTTP server in background and console chat in foreground."""
-    # Create unified app
+    # Event to signal when server startup is complete and agent is connected
+    startup_event = asyncio.Event()
+
+    # Create unified app (lifespan handles MCP connection)
     app = create_unified_app(
         agent,
         webchat_interface=webchat,
         webhook_interface=webhook,
+        startup_event=startup_event,
     )
 
     # Configure uvicorn
@@ -438,18 +449,18 @@ async def _run_http_and_console(
     )
     server = uvicorn.Server(config)
 
-    # Use agent as async context manager for MCP connections
-    async with agent:
-        # Start HTTP server in background task
-        server_task = asyncio.create_task(server.serve())
+    # Start HTTP server in background task
+    server_task = asyncio.create_task(server.serve())
 
-        try:
-            # Run console chat in foreground (blocking)
-            await async_run_console_chat(agent)
-        finally:
-            # Shutdown HTTP server when console exits
-            server.should_exit = True
-            await server_task
+    try:
+        # Wait for server startup to complete and agent to be connected
+        await startup_event.wait()
+        # Run console chat in foreground
+        await async_run_console_chat(agent)
+    finally:
+        # Shutdown HTTP server when console exits
+        server.should_exit = True
+        await server_task
 
 
 def _run_http_only(
