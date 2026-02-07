@@ -503,7 +503,11 @@ def create_webhook_app(
         # Startup: Subscribe to WebSub hub
         if websub_subscriber:
             # Run subscription in background to not block startup
-            asyncio.create_task(_subscribe_with_retry(websub_subscriber))
+            subscription_task = asyncio.create_task(
+                _subscribe_with_retry(websub_subscriber)
+            )
+            subscription_task.add_done_callback(_log_task_exception)
+            app.state.subscription_task = subscription_task
         yield
         # Shutdown: Unsubscribe from WebSub hub
         if websub_subscriber and websub_subscriber.is_verified:
@@ -569,6 +573,22 @@ async def _subscribe_with_retry(
             await asyncio.sleep(retry_delay)
 
     logger.error(f"Failed to subscribe to WebSub after {max_retries} attempts")
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    """Log any exception from an asyncio task.
+
+    This callback is used to ensure background tasks don't silently swallow
+    unexpected exceptions that escape their error handling.
+
+    Args:
+        task: The asyncio task to check for exceptions.
+    """
+    if not task.cancelled() and task.exception():
+        logger.error(
+            "Background subscription task failed with unexpected error",
+            exc_info=task.exception(),
+        )
 
 
 def _resolve_secret(secret: str | None) -> str | None:
