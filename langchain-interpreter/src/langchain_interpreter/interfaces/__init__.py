@@ -59,6 +59,7 @@ from .base import (
 
 # Console chat
 from .console_chat import (
+    ChatApp,
     async_run_console_chat,
     run_console_chat,
 )
@@ -91,6 +92,7 @@ __all__ = [
     "get_webhook_interface",
     "has_interface_type",
     # Console chat
+    "ChatApp",
     "async_run_console_chat",
     "run_console_chat",
     # Web chat

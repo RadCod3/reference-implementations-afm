@@ -1,21 +1,26 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Tests for console chat interface handler."""
+"""Tests for console chat interface handler using Textual."""
 
 from __future__ import annotations
 
-import io
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from textual.containers import VerticalScroll
+from textual.pilot import Pilot
+from textual.widgets import Input, Static
 
-from langchain_interpreter import AFMRecord, AgentMetadata
 from langchain_interpreter.agent import Agent
 from langchain_interpreter.interfaces.console_chat import (
+    ChatApp,
     async_run_console_chat,
     run_console_chat,
 )
+
+# Type alias for the app
+ChatPilot = Pilot[ChatApp]
 
 
 @pytest.fixture
@@ -24,354 +29,196 @@ def mock_agent() -> MagicMock:
     agent = MagicMock(spec=Agent)
     agent.name = "Test Agent"
     agent.description = "A test agent for unit testing"
-    agent.run = MagicMock(return_value="Hello! I'm the test agent.")
-    agent.arun = MagicMock(return_value="Hello! I'm the async test agent.")
+    # Mock arun to yield control back to the event loop
+    agent.arun = AsyncMock(return_value="Hello! I'm the test agent.")
     agent.clear_history = MagicMock()
     return agent
 
 
-@pytest.fixture
-def sample_afm() -> AFMRecord:
-    """Create a sample AFM record for testing."""
-    return AFMRecord(
-        metadata=AgentMetadata(
-            name="Test Agent",
-            description="A test agent",
-        ),
-        role="You are a helpful assistant.",
-        instructions="Be helpful and concise.",
-    )
+@pytest.mark.asyncio
+async def test_app_starts_with_welcome(mock_agent: MagicMock) -> None:
+    """Test that app starts and shows welcome message."""
+    app = ChatApp(mock_agent)
+    async with app.run_test():
+        # Check welcome message
+        chat_log = app.query_one("#chat-log")
+        assert chat_log is not None
+
+        welcome_widget = chat_log.query_one(".system-message", Static)
+        assert "Welcome to chat with Test Agent" in str(welcome_widget.render())
 
 
-class TestRunConsoleChat:
-    """Tests for run_console_chat function."""
+@pytest.mark.asyncio
+async def test_user_message_flow(mock_agent: MagicMock) -> None:
+    """Test sending a message and getting a response."""
+    app = ChatApp(mock_agent)
+    async with app.run_test() as pilot:
+        # Type message
+        input_widget = app.query_one("#chat-input", Input)
+        input_widget.value = "Hello!"
+        await pilot.press("enter")
 
-    def test_exit_command(self, mock_agent: MagicMock) -> None:
-        """Test that 'exit' command ends the chat."""
-        output = io.StringIO()
-        inputs = iter(["exit"])
+        # Wait for worker to complete
+        await pilot.pause()
 
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
+        # Check user message
+        chat_log = app.query_one("#chat-log", VerticalScroll)
+        user_msgs = chat_log.query(".user-message")
+        assert len(user_msgs) == 1
+        assert "Hello!" in str(user_msgs[0].render())
 
-        result = output.getvalue()
-        assert "Chat with Test Agent" in result
-        assert "Goodbye!" in result
-        mock_agent.run.assert_not_called()
+        # Check agent response
+        agent_msgs = chat_log.query(".agent-message")
+        assert len(agent_msgs) == 1
+        assert "Hello! I'm the test agent." in str(agent_msgs[0].render())
 
-    def test_quit_command(self, mock_agent: MagicMock) -> None:
-        """Test that 'quit' command ends the chat."""
-        output = io.StringIO()
-        inputs = iter(["quit"])
+        # Verify agent was called
+        mock_agent.arun.assert_called_once()
 
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
 
-        result = output.getvalue()
-        assert "Goodbye!" in result
-        mock_agent.run.assert_not_called()
-
-    def test_help_command(self, mock_agent: MagicMock) -> None:
-        """Test that 'help' command shows available commands."""
-        output = io.StringIO()
-        inputs = iter(["help", "exit"])
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
-
-        result = output.getvalue()
-        assert "Available commands:" in result
-        assert "exit, quit" in result
-        assert "help" in result
-        assert "clear" in result
-
-    def test_clear_command(self, mock_agent: MagicMock) -> None:
-        """Test that 'clear' command clears conversation history."""
-        output = io.StringIO()
-        inputs = iter(["clear", "exit"])
-
+@pytest.mark.asyncio
+async def test_run_console_chat(mock_agent: MagicMock) -> None:
+    """Test wrapper function."""
+    with patch("langchain_interpreter.interfaces.console_chat.ChatApp") as MockApp:
         run_console_chat(
             mock_agent,
             session_id="test-session",
-            input_fn=lambda _: next(inputs),
-            output=output,
         )
 
-        result = output.getvalue()
-        assert "Conversation history cleared" in result
-        mock_agent.clear_history.assert_called_once_with("test-session")
-
-    def test_empty_input_ignored(self, mock_agent: MagicMock) -> None:
-        """Test that empty input is ignored."""
-        output = io.StringIO()
-        inputs = iter(["", "   ", "exit"])
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
+        MockApp.assert_called_once_with(
+            mock_agent, session_id="test-session", agent_prefix="Agent: "
         )
-
-        mock_agent.run.assert_not_called()
-
-    def test_user_message_sent_to_agent(self, mock_agent: MagicMock) -> None:
-        """Test that user messages are sent to the agent."""
-        output = io.StringIO()
-        inputs = iter(["Hello!", "exit"])
-
-        run_console_chat(
-            mock_agent,
-            session_id="test-session",
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
-
-        mock_agent.run.assert_called_once_with("Hello!", session_id="test-session")
-        result = output.getvalue()
-        assert "Hello! I'm the test agent." in result
-
-    def test_thinking_indicator_shown(self, mock_agent: MagicMock) -> None:
-        """Test that thinking indicator is shown by default."""
-        output = io.StringIO()
-        inputs = iter(["Hello!", "exit"])
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-            show_thinking=True,
-        )
-
-        result = output.getvalue()
-        assert "[Thinking...]" in result
-
-    def test_thinking_indicator_hidden(self, mock_agent: MagicMock) -> None:
-        """Test that thinking indicator can be hidden."""
-        output = io.StringIO()
-        inputs = iter(["Hello!", "exit"])
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-            show_thinking=False,
-        )
-
-        result = output.getvalue()
-        assert "[Thinking...]" not in result
-
-    def test_custom_prompts(self, mock_agent: MagicMock) -> None:
-        """Test that custom prompts can be used."""
-        output = io.StringIO()
-        prompts_received: list[str] = []
-
-        def capture_prompt(prompt: str) -> str:
-            prompts_received.append(prompt)
-            return "exit"
-
-        run_console_chat(
-            mock_agent,
-            input_fn=capture_prompt,
-            output=output,
-            user_prompt=">> ",
-            agent_prefix="Bot: ",
-        )
-
-        assert prompts_received == [">> "]
-
-    def test_agent_error_handled(self, mock_agent: MagicMock) -> None:
-        """Test that agent errors are handled gracefully."""
-        output = io.StringIO()
-        inputs = iter(["Hello!", "exit"])
-        mock_agent.run.side_effect = Exception("Test error")
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
-
-        result = output.getvalue()
-        assert "[Error: Test error]" in result
-
-    def test_json_response_formatted(self, mock_agent: MagicMock) -> None:
-        """Test that JSON responses are formatted."""
-        output = io.StringIO()
-        inputs = iter(["Hello!", "exit"])
-        mock_agent.run.return_value = {"response": "test", "confidence": 0.9}
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
-
-        result = output.getvalue()
-        assert '"response": "test"' in result
-        assert '"confidence": 0.9' in result
-
-    def test_eof_ends_chat(self, mock_agent: MagicMock) -> None:
-        """Test that EOF (Ctrl+D) ends the chat."""
-        output = io.StringIO()
-
-        def raise_eof(_: str) -> str:
-            raise EOFError()
-
-        run_console_chat(
-            mock_agent,
-            input_fn=raise_eof,
-            output=output,
-        )
-
-        result = output.getvalue()
-        assert "Goodbye!" in result
-
-    def test_keyboard_interrupt_ends_chat(self, mock_agent: MagicMock) -> None:
-        """Test that KeyboardInterrupt (Ctrl+C) ends the chat."""
-        output = io.StringIO()
-
-        def raise_interrupt(_: str) -> str:
-            raise KeyboardInterrupt()
-
-        run_console_chat(
-            mock_agent,
-            input_fn=raise_interrupt,
-            output=output,
-        )
-
-        result = output.getvalue()
-        assert "Goodbye!" in result
-
-    def test_session_id_auto_generated(self, mock_agent: MagicMock) -> None:
-        """Test that session ID is auto-generated if not provided."""
-        output = io.StringIO()
-        inputs = iter(["Hello!", "exit"])
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
-
-        # Verify run was called with some session_id
-        call_args = mock_agent.run.call_args
-        assert call_args is not None
-        assert "session_id" in call_args.kwargs
-        assert len(call_args.kwargs["session_id"]) > 0
-
-    def test_welcome_shows_description(self, mock_agent: MagicMock) -> None:
-        """Test that welcome message shows agent description."""
-        output = io.StringIO()
-        inputs = iter(["exit"])
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
-
-        result = output.getvalue()
-        assert "A test agent for unit testing" in result
-
-    def test_welcome_without_description(self, mock_agent: MagicMock) -> None:
-        """Test that welcome message works without description."""
-        output = io.StringIO()
-        inputs = iter(["exit"])
-        mock_agent.description = None
-
-        run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
-
-        result = output.getvalue()
-        assert "Chat with Test Agent" in result
+        MockApp.return_value.run.assert_called_once()
 
 
-class TestAsyncRunConsoleChat:
-    """Tests for async_run_console_chat function."""
-
-    @pytest.mark.asyncio
-    async def test_exit_command(self, mock_agent: MagicMock) -> None:
-        """Test that 'exit' command ends the async chat."""
-        output = io.StringIO()
-        inputs = iter(["exit"])
-
-        await async_run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
-
-        result = output.getvalue()
-        assert "Chat with Test Agent" in result
-        assert "Goodbye!" in result
-
-    @pytest.mark.asyncio
-    async def test_user_message_sent_to_agent(self, mock_agent: MagicMock) -> None:
-        """Test that user messages use arun in async mode."""
-        output = io.StringIO()
-        inputs = iter(["Hello!", "exit"])
-
-        # Make arun a coroutine
-        async def mock_arun(msg: str, session_id: str) -> str:
-            return "Hello! I'm the async test agent."
-
-        mock_agent.arun = mock_arun
+@pytest.mark.asyncio
+async def test_async_run_console_chat(mock_agent: MagicMock) -> None:
+    """Test async wrapper function."""
+    with patch("langchain_interpreter.interfaces.console_chat.ChatApp") as MockApp:
+        # Mock run_async
+        MockApp.return_value.run_async = AsyncMock()
 
         await async_run_console_chat(
             mock_agent,
             session_id="test-session",
-            input_fn=lambda _: next(inputs),
-            output=output,
+            agent_prefix="Agent: ",
         )
 
-        result = output.getvalue()
-        assert "Hello! I'm the async test agent." in result
-
-    @pytest.mark.asyncio
-    async def test_clear_command(self, mock_agent: MagicMock) -> None:
-        """Test that 'clear' command clears conversation history in async mode."""
-        output = io.StringIO()
-        inputs = iter(["clear", "exit"])
-
-        await async_run_console_chat(
-            mock_agent,
-            session_id="test-session",
-            input_fn=lambda _: next(inputs),
-            output=output,
+        MockApp.assert_called_once_with(
+            mock_agent, session_id="test-session", agent_prefix="Agent: "
         )
+        MockApp.return_value.run_async.assert_called_once()
 
-        result = output.getvalue()
-        assert "Conversation history cleared" in result
-        mock_agent.clear_history.assert_called_once_with("test-session")
 
-    @pytest.mark.asyncio
-    async def test_agent_error_handled(self, mock_agent: MagicMock) -> None:
-        """Test that agent errors are handled gracefully in async mode."""
-        output = io.StringIO()
-        inputs = iter(["Hello!", "exit"])
+@pytest.mark.asyncio
+async def test_help_command(mock_agent: MagicMock) -> None:
+    """Test help command."""
+    app = ChatApp(mock_agent)
+    async with app.run_test() as pilot:
+        input_widget = app.query_one("#chat-input", Input)
+        input_widget.value = "help"
+        await pilot.press("enter")
 
-        async def mock_arun_error(msg: str, session_id: str) -> str:
-            raise Exception("Async test error")
+        await pilot.pause()
 
-        mock_agent.arun = mock_arun_error
+        # Check for help message
+        chat_log = app.query_one("#chat-log")
+        system_msgs = chat_log.query(".system-message")
+        # Should be welcome + help
+        assert len(system_msgs) >= 2
+        last_msg = system_msgs[-1]
+        assert "Available commands" in str(last_msg.render())
 
-        await async_run_console_chat(
-            mock_agent,
-            input_fn=lambda _: next(inputs),
-            output=output,
-        )
 
-        result = output.getvalue()
-        assert "[Error: Async test error]" in result
+@pytest.mark.asyncio
+async def test_clear_command(mock_agent: MagicMock) -> None:
+    """Test clear command."""
+    app = ChatApp(mock_agent)
+    async with app.run_test() as pilot:
+        input_widget = app.query_one("#chat-input", Input)
+        input_widget.value = "clear"
+        await pilot.press("enter")
+
+        await pilot.pause()
+
+        # Check confirmation
+        chat_log = app.query_one("#chat-log")
+        system_msgs = chat_log.query(".system-message")
+        last_msg = system_msgs[-1]
+        assert "history cleared" in str(last_msg.render())
+
+        # Verify agent called
+        mock_agent.clear_history.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_exit_command(mock_agent: MagicMock) -> None:
+    """Test exit command."""
+    app = ChatApp(mock_agent)
+    async with app.run_test() as pilot:
+        input_widget = app.query_one("#chat-input", Input)
+        input_widget.value = "exit"
+        await pilot.press("enter")
+
+        # App should exit
+        await pilot.pause()
+        assert not app.is_running
+
+
+@pytest.mark.asyncio
+async def test_keybindings(mock_agent: MagicMock) -> None:
+    """Test keybindings."""
+    app = ChatApp(mock_agent)
+    async with app.run_test() as pilot:
+        # Ctrl+H for help
+        await pilot.press("ctrl+h")
+        await pilot.pause()
+
+        sys_msgs = app.query(".system-message")
+        assert "Available commands" in str(sys_msgs[-1].render())
+
+        # Ctrl+L for clear
+        await pilot.press("ctrl+l")
+        await pilot.pause()
+        assert "history cleared" in str(app.query(".system-message")[-1].render())
+
+        # Ctrl+Q for quit
+        await pilot.press("ctrl+q")
+        await pilot.pause()
+        assert not app.is_running
+
+
+@pytest.mark.asyncio
+async def test_agent_error_display(mock_agent: MagicMock) -> None:
+    """Test that agent errors are displayed."""
+    mock_agent.arun.side_effect = Exception("Test Error")
+
+    app = ChatApp(mock_agent)
+    async with app.run_test() as pilot:
+        input_widget = app.query_one("#chat-input", Input)
+        input_widget.value = "Hello"
+        await pilot.press("enter")
+
+        await pilot.pause()
+
+        # Check error message
+        errors = app.query(".error-message")
+        assert len(errors) == 1
+        assert "Test Error" in str(errors[0].render())
+
+
+@pytest.mark.asyncio
+async def test_json_response(mock_agent: MagicMock) -> None:
+    """Test that JSON responses are formatted."""
+    mock_agent.arun.return_value = {"foo": "bar"}
+
+    app = ChatApp(mock_agent)
+    async with app.run_test() as pilot:
+        input_widget = app.query_one("#chat-input", Input)
+        input_widget.value = "Hello"
+        await pilot.press("enter")
+
+        await pilot.pause()
+
+        agent_msgs = app.query(".agent-message")
+        assert '"foo": "bar"' in str(agent_msgs[0].render())

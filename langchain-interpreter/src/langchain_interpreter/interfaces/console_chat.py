@@ -1,374 +1,217 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Console chat interface handler.
+"""Console chat interface handler using Textual TUI.
 
-This module provides an interactive terminal-based chat interface for
-AFM agents. It reads user input from stdin and prints agent responses
-to stdout.
+This module provides a rich terminal-based chat interface for AFM agents
+using the Textual framework.
 """
 
 from __future__ import annotations
 
-import asyncio
-import sys
+import logging
 import uuid
-from typing import TYPE_CHECKING, Callable, TextIO
+from typing import TYPE_CHECKING
+
+from rich.markup import escape
+from textual import work
+from textual.app import App, ComposeResult
+from textual.containers import Vertical, VerticalScroll
+from textual.widgets import Footer, Header, Input, LoadingIndicator, Static
 
 if TYPE_CHECKING:
     from ..agent import Agent
 
-# Default prompts
+# Default prompts/messages
 DEFAULT_USER_PROMPT = "You: "
 DEFAULT_AGENT_PREFIX = "Agent: "
 
-
-def _print_welcome(agent: Agent, output: TextIO) -> None:
-    """Print the welcome message for the chat session.
-
-    Args:
-        agent: The agent instance.
-        output: The output stream to write to.
-    """
-    name = agent.name
-    description = agent.description
-
-    output.write(f"\n{'=' * 50}\n")
-    output.write(f"Chat with {name}\n")
-    if description:
-        output.write(f"{description}\n")
-    output.write(f"{'=' * 50}\n")
-    output.write("Type 'exit' or 'quit' to end the chat\n")
-    output.write("Type 'help' for available commands\n")
-    output.write("Type 'clear' to clear conversation history\n")
-    output.write("\n")
-    output.flush()
+logger = logging.getLogger(__name__)
 
 
-def _print_help(output: TextIO) -> None:
-    """Print the help message.
+class ChatApp(App):
+    """Textual application for the chat interface."""
 
-    Args:
-        output: The output stream to write to.
-    """
-    output.write("\nAvailable commands:\n")
-    output.write("  exit, quit  - End the chat session\n")
-    output.write("  help        - Show this help message\n")
-    output.write("  clear       - Clear conversation history\n")
-    output.write("\n")
-    output.flush()
+    CSS_PATH = "console_chat.tcss"
+    BINDINGS = [
+        ("ctrl+q", "quit", "Quit"),
+        ("ctrl+l", "clear_history", "Clear History"),
+        ("ctrl+h", "show_help", "Help"),
+    ]
 
+    def __init__(
+        self,
+        agent: Agent,
+        session_id: str | None = None,
+        agent_prefix: str = DEFAULT_AGENT_PREFIX,
+    ):
+        """Initialize the chat app.
 
-def _print_thinking(output: TextIO) -> None:
-    """Print the thinking indicator.
+        Args:
+            agent: The AFM agent instance.
+            session_id: Optional session ID. If None, one is generated.
+            agent_prefix: Prefix for agent messages.
+        """
+        super().__init__()
+        self.agent = agent
+        self.session_id = session_id or str(uuid.uuid4())
+        self.agent_prefix = agent_prefix
 
-    Args:
-        output: The output stream to write to.
-    """
-    output.write("[Thinking...]\n")
-    output.flush()
+    def compose(self) -> ComposeResult:
+        """Compose the layout of the app."""
+        yield Header()
+        yield VerticalScroll(id="chat-log")
+        yield Input(placeholder="Type a message...", id="chat-input")
+        yield Footer()
 
+    def on_mount(self) -> None:
+        """Called when the app is mounted."""
+        logger.debug("ChatApp.on_mount called")
+        self.title = f"Chat with {self.agent.name}"
+        if self.agent.description:
+            self.sub_title = self.agent.description
 
-def _print_response(response: str, output: TextIO, prefix: str) -> None:
-    """Print the agent's response.
+        # Show welcome message
+        welcome_msg = (
+            f"Welcome to chat with {self.agent.name}!\n"
+            "type 'exit', 'quit' or Ctrl+Q to end.\n"
+            "type 'help' or Ctrl+H for help.\n"
+            "type 'clear' or Ctrl+L to clear history."
+        )
+        self.query_one("#chat-log").mount(Static(welcome_msg, classes="system-message"))
+        self.query_one("#chat-input").focus()
 
-    Args:
-        response: The agent's response text.
-        output: The output stream to write to.
-        prefix: The prefix to use before the response.
-    """
-    output.write(f"{prefix}{response}\n\n")
-    output.flush()
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle input submission."""
+        logger.debug(f"on_input_submitted triggered. Value: '{event.value}'")
+        try:
+            user_input = event.value.strip()
+            logger.debug(f"Input submitted: {user_input}")
+            if not user_input:
+                return
 
+            # Clear input
+            event.input.value = ""
 
-def _print_error(error: str, output: TextIO) -> None:
-    """Print an error message.
+            # Handle local commands
+            command = user_input.lower()
+            if command in ("exit", "quit"):
+                self.exit()
+                return
 
-    Args:
-        error: The error message.
-        output: The output stream to write to.
-    """
-    output.write(f"[Error: {error}]\n\n")
-    output.flush()
+            if command == "help":
+                self.action_show_help()
+                return
 
+            if command == "clear":
+                self.action_clear_history()
+                return
 
-def _print_cleared(output: TextIO) -> None:
-    """Print the history cleared message.
+            # Display user message
+            chat_log = self.query_one("#chat-log")
+            msg_widget = Static(f"{escape(user_input)}", classes="message user-message")
+            await chat_log.mount(
+                Vertical(
+                    msg_widget, classes="message-container message-container--user"
+                )
+            )
 
-    Args:
-        output: The output stream to write to.
-    """
-    output.write("[Conversation history cleared]\n\n")
-    output.flush()
+            # Send to agent
+            self._send_message(user_input)
+        except Exception:
+            logger.exception("Error in on_input_submitted")
 
+    @work(exclusive=True)
+    async def _send_message(self, user_input: str) -> None:
+        """Send message to agent and display response."""
+        logger.debug(f"Sending message to agent: {user_input}")
 
-def _print_goodbye(output: TextIO) -> None:
-    """Print the goodbye message.
+        try:
+            chat_log = self.query_one("#chat-log", VerticalScroll)
 
-    Args:
-        output: The output stream to write to.
-    """
-    output.write("\nGoodbye!\n")
-    output.flush()
+            # Show thinking indicator
+            thinking = LoadingIndicator()
+            await chat_log.mount(thinking)
+            chat_log.scroll_end(animate=False)
 
+            response = await self.agent.arun(user_input, session_id=self.session_id)
 
-async def _async_input(prompt: str, output: TextIO) -> str:
-    """Read a line from stdin without blocking the event loop.
+            # Handle non-string responses
+            if not isinstance(response, str):
+                import json
 
-    Args:
-        prompt: The prompt string to display.
-        output: The output stream to write the prompt to.
+                response = json.dumps(response, indent=2)
 
-    Returns:
-        The line entered by the user (without trailing newline).
+            # Remove thinking and show response
+            await thinking.remove()
+            logger.debug(f"Mounting response: '{response}'")
 
-    Raises:
-        EOFError: When stdin reaches end-of-file (e.g. Ctrl-D).
-    """
-    loop = asyncio.get_running_loop()
-    future: asyncio.Future[None] = loop.create_future()
+            msg_widget = Static(f"{escape(response)}", classes="message agent-message")
+            await chat_log.mount(
+                Vertical(
+                    msg_widget, classes="message-container message-container--agent"
+                )
+            )
+            chat_log.scroll_end(animate=True)
 
-    fd = sys.stdin.fileno()
+        except Exception as e:
+            logger.exception("Error in _send_message")
+            # Try to report error to UI if possible
+            try:
+                chat_log = self.query_one("#chat-log", VerticalScroll)
+                # Ensure thinking is removed if it was added
+                try:
+                    await thinking.remove()
+                except UnboundLocalError:
+                    pass
+                except Exception:
+                    pass
 
-    def _on_readable() -> None:
-        if not future.done():
-            future.set_result(None)
+                await chat_log.mount(
+                    Static(f"[Error: {str(e)}]", classes="error-message", markup=False)
+                )
+            except Exception as e2:
+                logger.exception(f"Could not report error to UI: {e2}")
 
-    output.write(prompt)
-    output.flush()
+    def action_show_help(self) -> None:
+        """Show help message."""
+        help_msg = (
+            "Available commands:\n"
+            "  exit, quit, Ctrl+Q  - End the chat session\n"
+            "  help,     Ctrl+H    - Show this help message\n"
+            "  clear,    Ctrl+L    - Clear conversation history"
+        )
+        self.query_one("#chat-log").mount(Static(help_msg, classes="system-message"))
+        self.query_one("#chat-log").scroll_end()
 
-    loop.add_reader(fd, _on_readable)
-    try:
-        await future
-        line = sys.stdin.readline()
-        if not line:
-            raise EOFError
-        return line.rstrip("\n")
-    finally:
-        loop.remove_reader(fd)
+    def action_clear_history(self) -> None:
+        """Clear conversation history."""
+        self.agent.clear_history(self.session_id)
+        self.query_one("#chat-log").mount(
+            Static(
+                "[Conversation history cleared]", classes="system-message", markup=False
+            )
+        )
+        self.query_one("#chat-log").scroll_end()
 
 
 def run_console_chat(
     agent: Agent,
     *,
     session_id: str | None = None,
-    input_fn: Callable[[str], str] | None = None,
-    output: TextIO | None = None,
-    user_prompt: str = DEFAULT_USER_PROMPT,
     agent_prefix: str = DEFAULT_AGENT_PREFIX,
-    show_thinking: bool = True,
 ) -> None:
-    """Run an interactive console chat session with the agent.
-
-    This function starts a blocking REPL loop that:
-    - Reads user input from stdin (or custom input function)
-    - Sends input to the agent
-    - Prints the agent's response to stdout (or custom output stream)
-    - Supports commands: exit, quit, help, clear
-
-    The session continues until the user types 'exit' or 'quit',
-    or sends EOF (Ctrl+D), or a KeyboardInterrupt (Ctrl+C) is received.
-
-    Args:
-        agent: The AFM agent to chat with.
-        session_id: Optional session ID for conversation history.
-                   If not provided, a random UUID is generated.
-        input_fn: Optional custom input function. Defaults to built-in input().
-                 Should accept a prompt string and return user input.
-        output: Optional output stream. Defaults to sys.stdout.
-        user_prompt: The prompt shown to the user. Defaults to "You: ".
-        agent_prefix: The prefix for agent responses. Defaults to "Agent: ".
-        show_thinking: Whether to show "[Thinking...]" while waiting. Defaults to True.
-
-    Example:
-        >>> from langchain_interpreter import parse_afm_file, Agent
-        >>> from langchain_interpreter.interfaces import run_console_chat
-        >>> afm = parse_afm_file("my_agent.afm.md")
-        >>> agent = Agent(afm)
-        >>> run_console_chat(agent)
-    """
-    # Set up defaults
-    if session_id is None:
-        session_id = str(uuid.uuid4())
-    if input_fn is None:
-        input_fn = input
-    if output is None:
-        output = sys.stdout
-
-    # Print welcome message
-    _print_welcome(agent, output)
-
-    # Main chat loop
-    while True:
-        try:
-            # Read user input
-            user_input = input_fn(user_prompt)
-
-            # Handle empty input
-            if not user_input.strip():
-                continue
-
-            # Handle commands
-            command = user_input.strip().lower()
-
-            if command in ("exit", "quit"):
-                _print_goodbye(output)
-                break
-
-            if command == "help":
-                _print_help(output)
-                continue
-
-            if command == "clear":
-                agent.clear_history(session_id)
-                _print_cleared(output)
-                continue
-
-            # Show thinking indicator
-            if show_thinking:
-                _print_thinking(output)
-
-            # Run the agent
-            try:
-                response = agent.run(user_input, session_id=session_id)
-
-                # Convert response to string if needed
-                if not isinstance(response, str):
-                    import json
-
-                    response = json.dumps(response, indent=2)
-
-                _print_response(response, output, agent_prefix)
-
-            except Exception as e:
-                _print_error(str(e), output)
-
-        except EOFError:
-            # Handle Ctrl+D
-            _print_goodbye(output)
-            break
-
-        except KeyboardInterrupt:
-            # Handle Ctrl+C
-            output.write("\n")
-            _print_goodbye(output)
-            break
+    """Run an interactive console chat session with the agent."""
+    app = ChatApp(agent, session_id=session_id, agent_prefix=agent_prefix)
+    app.run()
 
 
 async def async_run_console_chat(
     agent: Agent,
     *,
     session_id: str | None = None,
-    input_fn: Callable[[str], str] | None = None,
-    output: TextIO | None = None,
-    user_prompt: str = DEFAULT_USER_PROMPT,
     agent_prefix: str = DEFAULT_AGENT_PREFIX,
-    show_thinking: bool = True,
 ) -> None:
-    """Async version of run_console_chat.
-
-    This function uses the agent's async run method (arun) for executing
-    queries. When using the default ``input()`` function, stdin is read via
-    the event loop's fd-readiness API (``add_reader``) so that the task is
-    immediately cancellable — for example when the HTTP server dies and the
-    CLI needs to exit without waiting for the user to press Enter.
-
-    When a custom *input_fn* is supplied (e.g. in tests), it is executed in
-    a thread via ``run_in_executor`` to stay compatible with synchronous
-    callables.
-
-    Args:
-        agent: The AFM agent to chat with.
-        session_id: Optional session ID for conversation history.
-        input_fn: Optional custom input function.
-        output: Optional output stream.
-        user_prompt: The prompt shown to the user.
-        agent_prefix: The prefix for agent responses.
-        show_thinking: Whether to show "[Thinking...]" while waiting.
-
-    Example:
-        >>> import asyncio
-        >>> from langchain_interpreter import parse_afm_file, Agent
-        >>> from langchain_interpreter.interfaces import async_run_console_chat
-        >>> afm = parse_afm_file("my_agent.afm.md")
-        >>> agent = Agent(afm)
-        >>> asyncio.run(async_run_console_chat(agent))
-    """
-    # Set up defaults
-    if session_id is None:
-        session_id = str(uuid.uuid4())
-
-    # When no custom input_fn is given we use _async_input which is
-    # cancellable (event-loop driven).  A custom input_fn is run in a
-    # thread executor for backwards-compatibility with tests.
-    use_async_input = input_fn is None
-    if input_fn is None:
-        input_fn = input
-    if output is None:
-        output = sys.stdout
-
-    # Get the event loop once for use in the chat loop
-    loop = asyncio.get_running_loop()
-
-    # Print welcome message
-    _print_welcome(agent, output)
-
-    # Main chat loop
-    while True:
-        try:
-            # Read user input — either via the cancellable async reader
-            # (default) or via a thread executor (custom input_fn).
-            if use_async_input:
-                user_input = await _async_input(user_prompt, output)
-            else:
-                user_input = await loop.run_in_executor(None, input_fn, user_prompt)
-
-            # Handle empty input
-            if not user_input.strip():
-                continue
-
-            # Handle commands
-            command = user_input.strip().lower()
-
-            if command in ("exit", "quit"):
-                _print_goodbye(output)
-                break
-
-            if command == "help":
-                _print_help(output)
-                continue
-
-            if command == "clear":
-                agent.clear_history(session_id)
-                _print_cleared(output)
-                continue
-
-            # Show thinking indicator
-            if show_thinking:
-                _print_thinking(output)
-
-            # Run the agent asynchronously
-            try:
-                response = await agent.arun(user_input, session_id=session_id)
-
-                # Convert response to string if needed
-                if not isinstance(response, str):
-                    import json
-
-                    response = json.dumps(response, indent=2)
-
-                _print_response(response, output, agent_prefix)
-
-            except Exception as e:
-                _print_error(str(e), output)
-
-        except EOFError:
-            # Handle Ctrl+D
-            _print_goodbye(output)
-            break
-
-        except KeyboardInterrupt:
-            # Handle Ctrl+C
-            output.write("\n")
-            _print_goodbye(output)
-            break
+    """Async version of run_console_chat."""
+    app = ChatApp(agent, session_id=session_id, agent_prefix=agent_prefix)
+    await app.run_async()
