@@ -10,13 +10,11 @@ AFM agents to external tool servers.
 from .mcp import (
     MCPClient,
     MCPManager,
-    build_auth_headers,
     filter_tools,
 )
 
 __all__ = [
     "MCPClient",
     "MCPManager",
-    "build_auth_headers",
     "filter_tools",
 ]

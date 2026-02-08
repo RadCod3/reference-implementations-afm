@@ -41,7 +41,7 @@ class ClientAuthentication(BaseModel):
     @model_validator(mode="after")
     def validate_type_fields(self) -> Self:
         """Validate that the required fields for each type are present."""
-        match self.type:
+        match self.type.lower():
             case "bearer":
                 if self.token is None:
                     raise ValueError("type 'bearer' requires 'token' field")

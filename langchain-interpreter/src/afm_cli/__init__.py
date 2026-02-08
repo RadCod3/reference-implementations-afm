@@ -106,7 +106,6 @@ from .templates import access_json_field, compile_template, evaluate_template
 from .tools import (
     MCPClient,
     MCPManager,
-    build_auth_headers,
     filter_tools,
 )
 from .variables import (
@@ -195,7 +194,6 @@ __all__ = [
     # MCP Classes
     "MCPClient",
     "MCPManager",
-    "build_auth_headers",
     "filter_tools",
     # Interface Functions
     "get_interfaces",

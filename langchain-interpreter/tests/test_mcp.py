@@ -21,8 +21,6 @@ from afm_cli import (
     MCPServer,
     ToolFilter,
     Tools,
-    Transport,
-    build_auth_headers,
     filter_tools,
 )
 from afm_cli.tools.mcp import (
@@ -95,89 +93,6 @@ def make_mock_tool(name: str, description: str = "A test tool") -> MagicMock:
 # =============================================================================
 # Authentication Header Tests
 # =============================================================================
-
-
-class TestBuildAuthHeaders:
-    """Tests for build_auth_headers function."""
-
-    def test_none_auth_returns_empty_dict(self):
-        """No auth returns empty headers."""
-        result = build_auth_headers(None)
-        assert result == {}
-
-    def test_bearer_auth_returns_bearer_header(self):
-        """Bearer auth returns Authorization: Bearer header."""
-        auth = ClientAuthentication(type="bearer", token="my-token")
-        result = build_auth_headers(auth)
-        assert result == {"Authorization": "Bearer my-token"}
-
-    def test_basic_auth_returns_basic_header(self):
-        """Basic auth returns base64-encoded Authorization header."""
-        auth = ClientAuthentication(type="basic", username="user", password="pass")
-        result = build_auth_headers(auth)
-        # "user:pass" -> base64 "dXNlcjpwYXNz"
-        assert result == {"Authorization": "Basic dXNlcjpwYXNz"}
-
-    def test_api_key_auth_returns_api_key_header(self):
-        """API key auth returns Authorization header with raw key."""
-        auth = ClientAuthentication(type="api-key", api_key="my-api-key")
-        result = build_auth_headers(auth)
-        assert result == {"Authorization": "my-api-key"}
-
-    def test_bearer_auth_missing_token_raises_pydantic_error(self):
-        """Bearer auth without token raises Pydantic ValidationError at model creation."""
-        # Pydantic validates at model creation time, not at build_auth_headers
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError, match="requires 'token' field"):
-            ClientAuthentication(type="bearer")
-
-    def test_basic_auth_missing_username_raises_pydantic_error(self):
-        """Basic auth without username raises Pydantic ValidationError at model creation."""
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError, match="requires 'username' and 'password'"):
-            ClientAuthentication(type="basic", password="pass")
-
-    def test_basic_auth_missing_password_raises_pydantic_error(self):
-        """Basic auth without password raises Pydantic ValidationError at model creation."""
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError, match="requires 'username' and 'password'"):
-            ClientAuthentication(type="basic", username="user")
-
-    def test_api_key_auth_missing_key_raises_pydantic_error(self):
-        """API key auth without key raises Pydantic ValidationError at model creation."""
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError, match="requires 'api_key' field"):
-            ClientAuthentication(type="api-key")
-
-    def test_oauth2_auth_not_supported(self):
-        """OAuth2 auth raises not supported error."""
-        auth = ClientAuthentication(type="oauth2")
-        with pytest.raises(MCPAuthenticationError, match="not yet supported"):
-            build_auth_headers(auth)
-
-    def test_jwt_auth_not_supported(self):
-        """JWT auth raises not supported error."""
-        auth = ClientAuthentication(type="jwt")
-        with pytest.raises(MCPAuthenticationError, match="not yet supported"):
-            build_auth_headers(auth)
-
-    def test_unknown_auth_type_raises_error(self):
-        """Unknown auth type raises MCPAuthenticationError."""
-        auth = ClientAuthentication(type="unknown")
-        with pytest.raises(
-            MCPAuthenticationError, match="Unsupported authentication type"
-        ):
-            build_auth_headers(auth)
-
-    def test_auth_type_is_case_insensitive(self):
-        """Auth type matching is case-insensitive."""
-        auth = ClientAuthentication(type="BEARER", token="my-token")
-        result = build_auth_headers(auth)
-        assert result == {"Authorization": "Bearer my-token"}
 
 
 class TestBuildHttpxAuth:
@@ -385,7 +300,7 @@ class TestMCPClient:
         config = client._build_connection_config()
 
         assert "auth" in config
-        assert isinstance(config["auth"], BearerAuth)
+        assert isinstance(config.get("auth"), BearerAuth)
 
     @pytest.mark.asyncio
     async def test_get_tools_calls_mcp_client(self):

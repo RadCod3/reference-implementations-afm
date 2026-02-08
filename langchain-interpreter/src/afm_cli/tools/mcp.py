@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import base64
 import logging
 from typing import Any
 
@@ -50,42 +49,6 @@ class ApiKeyAuth(httpx.Auth):
     def auth_flow(self, request: httpx.Request):
         request.headers[self.header_name] = self.api_key
         yield request
-
-
-def build_auth_headers(auth: ClientAuthentication | None) -> dict[str, str]:
-    """Build HTTP headers from authentication configuration."""
-    if auth is None:
-        return {}
-
-    auth_type = auth.type.lower()
-
-    if auth_type == "bearer":
-        if auth.token is None:
-            raise MCPAuthenticationError("Bearer auth requires 'token' field")
-        return {"Authorization": f"Bearer {auth.token}"}
-
-    elif auth_type == "basic":
-        if auth.username is None or auth.password is None:
-            raise MCPAuthenticationError(
-                "Basic auth requires 'username' and 'password' fields"
-            )
-        credentials = base64.b64encode(
-            f"{auth.username}:{auth.password}".encode()
-        ).decode()
-        return {"Authorization": f"Basic {credentials}"}
-
-    elif auth_type == "api-key":
-        if auth.api_key is None:
-            raise MCPAuthenticationError("API key auth requires 'api_key' field")
-        return {"Authorization": auth.api_key}
-
-    elif auth_type in ("oauth2", "jwt"):
-        raise MCPAuthenticationError(
-            f"Authentication type '{auth_type}' not yet supported"
-        )
-
-    else:
-        raise MCPAuthenticationError(f"Unsupported authentication type: {auth_type}")
 
 
 def build_httpx_auth(auth: ClientAuthentication | None) -> httpx.Auth | None:

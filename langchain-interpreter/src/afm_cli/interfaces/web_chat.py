@@ -182,17 +182,22 @@ def create_webchat_router(
 
             except HTTPException:
                 raise
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 raise HTTPException(
                     status_code=400,
                     detail="Invalid JSON in request body",
-                )
+                ) from e
+            except UnicodeDecodeError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Request body must be valid UTF-8",
+                ) from e
             except Exception as e:
                 logger.exception(f"Error in chat_string for session {session_id}: {e}")
                 raise HTTPException(
                     status_code=500,
                     detail="Internal server error",
-                )
+                ) from e
 
     else:
         # Complex schema-based chat
@@ -255,17 +260,17 @@ def create_webchat_router(
 
             except HTTPException:
                 raise
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 raise HTTPException(
                     status_code=400,
                     detail="Invalid JSON in request body",
-                )
+                ) from e
             except Exception as e:
                 logger.exception(f"Error in chat_object for session {session_id}: {e}")
                 raise HTTPException(
                     status_code=500,
                     detail="Internal server error",
-                )
+                ) from e
 
     return router
 
