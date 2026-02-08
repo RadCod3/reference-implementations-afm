@@ -1,14 +1,7 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Webhook interface handler.
-
-This module provides an HTTP endpoint for receiving webhook events and
-processing them with AFM agents. It supports:
-- Template evaluation for constructing prompts from webhook payloads
-- HMAC signature verification
-- WebSub auto-subscription on startup
-"""
+"""Webhook interface handler."""
 
 from __future__ import annotations
 
@@ -37,11 +30,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Request/Response Models
-# =============================================================================
-
-
 class WebhookResponse(BaseModel):
     """Response model for webhook processing."""
 
@@ -59,11 +47,6 @@ class HealthResponse(BaseModel):
     """Response model for health check endpoint."""
 
     status: str = Field("ok", description="Health status")
-
-
-# =============================================================================
-# WebSub Subscription Handler
-# =============================================================================
 
 
 class WebSubSubscriber:
@@ -216,11 +199,6 @@ class WebSubSubscriber:
         return None
 
 
-# =============================================================================
-# Signature Verification
-# =============================================================================
-
-
 def verify_webhook_signature(
     body: bytes,
     signature_header: str | None,
@@ -273,11 +251,6 @@ def verify_webhook_signature(
 
     # Constant-time comparison
     return hmac.compare_digest(expected_sig.lower(), provided_sig.lower())
-
-
-# =============================================================================
-# Webhook Router Factory
-# =============================================================================
 
 
 def create_webhook_router(
@@ -427,11 +400,6 @@ def create_webhook_router(
     return router
 
 
-# =============================================================================
-# Webhook App Factory
-# =============================================================================
-
-
 def create_webhook_app(
     agent: Agent,
     *,
@@ -577,14 +545,6 @@ async def subscribe_with_retry(
 
 
 def log_task_exception(task: asyncio.Task) -> None:
-    """Log any exception from an asyncio task.
-
-    This callback is used to ensure background tasks don't silently swallow
-    unexpected exceptions that escape their error handling.
-
-    Args:
-        task: The asyncio task to check for exceptions.
-    """
     if not task.cancelled() and task.exception():
         logger.error(
             "Background subscription task failed with unexpected error",
@@ -593,17 +553,6 @@ def log_task_exception(task: asyncio.Task) -> None:
 
 
 def resolve_secret(secret: str | None) -> str | None:
-    """Resolve a secret value, handling environment variable substitution.
-
-    Args:
-        secret: The secret string, possibly containing ${env:VAR} syntax.
-
-    Returns:
-        The resolved secret value, or None if not set.
-
-    Raises:
-        VariableResolutionError: If environment variable resolution fails.
-    """
     if not secret:
         return None
 

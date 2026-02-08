@@ -1,48 +1,7 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Interface handlers for AFM agents.
-
-This module provides interface handlers that expose AFM agents through
-different interaction modes:
-
-- **Console Chat**: Interactive terminal-based chat
-- **Web Chat**: HTTP REST endpoint for chat
-- **Webhook**: HTTP endpoint for receiving webhook events
-
-Example usage:
-
-    Console Chat::
-
-        from afm_cli import parse_afm_file, Agent
-        from afm_cli.interfaces import run_console_chat
-
-        afm = parse_afm_file("my_agent.afm.md")
-        agent = Agent(afm)
-        run_console_chat(agent)
-
-    Web Chat::
-
-        from afm_cli import parse_afm_file, Agent
-        from afm_cli.interfaces import create_webchat_app
-        import uvicorn
-
-        afm = parse_afm_file("my_agent.afm.md")
-        agent = Agent(afm)
-        app = create_webchat_app(agent)
-        uvicorn.run(app, host="0.0.0.0", port=8000)
-
-    Webhook::
-
-        from afm_cli import parse_afm_file, Agent
-        from afm_cli.interfaces import create_webhook_app
-        import uvicorn
-
-        afm = parse_afm_file("webhook_agent.afm.md")
-        agent = Agent(afm)
-        app = create_webhook_app(agent)
-        uvicorn.run(app, host="0.0.0.0", port=8000)
-"""
+"""Interface handlers for AFM agents."""
 
 # Base utilities
 from .base import (

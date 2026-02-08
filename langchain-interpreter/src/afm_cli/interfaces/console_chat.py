@@ -1,11 +1,7 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Console chat interface handler using Textual TUI.
-
-This module provides a rich terminal-based chat interface for AFM agents
-using the Textual framework.
-"""
+"""Console chat interface handler using Textual TUI."""
 
 from __future__ import annotations
 

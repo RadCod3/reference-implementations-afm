@@ -1,11 +1,7 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Web chat interface handler.
-
-This module provides an HTTP REST endpoint for chatting with AFM agents
-using FastAPI.
-"""
+"""Web chat interface handler."""
 
 from __future__ import annotations
 
@@ -59,11 +55,6 @@ if TYPE_CHECKING:
     from ..models import Signature
 
 
-# =============================================================================
-# Request/Response Models
-# =============================================================================
-
-
 class ObjectChatResponse(BaseModel):
     """Response model for object-based chat (pass-through)."""
 
@@ -90,11 +81,6 @@ class ErrorResponse(BaseModel):
 
     error: str = Field(..., description="Error message")
     detail: str | None = Field(None, description="Detailed error information")
-
-
-# =============================================================================
-# Webchat Router Factory
-# =============================================================================
 
 
 def create_webchat_router(
@@ -284,11 +270,6 @@ def create_webchat_router(
     return router
 
 
-# =============================================================================
-# Web Chat App Factory
-# =============================================================================
-
-
 def create_webchat_app(
     agent: Agent,
     *,
@@ -351,13 +332,9 @@ def create_webchat_app(
             allow_headers=["*"],
         )
 
-    # Store agent reference
     app.state.agent = agent
 
-    # ==========================================================================
     # Metadata Endpoints
-    # ==========================================================================
-
     @app.get("/", response_model=AgentInfo)
     async def get_agent_info() -> AgentInfo:
         """Get agent metadata."""
@@ -371,10 +348,6 @@ def create_webchat_app(
     async def health_check() -> HealthResponse:
         """Health check endpoint."""
         return HealthResponse(status="ok")
-
-    # ==========================================================================
-    # Include Chat Router
-    # ==========================================================================
 
     chat_router = create_webchat_router(agent, signature, chat_path)
     app.include_router(chat_router)

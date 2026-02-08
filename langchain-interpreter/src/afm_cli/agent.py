@@ -36,24 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class Agent:
-    """AFM Agent runtime using LangChain.
-
-    This class wraps a parsed AFMRecord and provides methods to run the agent
-    with user input. It handles:
-    - System prompt construction from Role + Instructions
-    - LLM provider configuration
-    - Session/conversation history management
-    - Input/output schema validation
-    - MCP tool server connections (when configured)
-
-    For agents with MCP tools, use as an async context manager:
-        >>> async with Agent(afm) as agent:
-        ...     response = await agent.arun("Hello!")
-
-    For agents without MCP tools, the context manager is optional:
-        >>> agent = Agent(afm)
-        >>> response = agent.run("Hello!")
-    """
+    """AFM Agent runtime using LangChain."""
 
     def __init__(
         self,
@@ -62,20 +45,6 @@ class Agent:
         model: BaseChatModel | None = None,
         tools: list[BaseTool] | None = None,
     ) -> None:
-        """Initialize the agent from a parsed AFM record.
-
-        Args:
-            afm: The parsed AFM record containing metadata, role, and instructions.
-            model: Optional LangChain chat model to use. If not provided,
-                   a model will be created from the AFM model configuration.
-            tools: Optional list of LangChain tools to use. If not provided,
-                   tools will be loaded from MCP servers when using the
-                   async context manager.
-
-        Raises:
-            AgentConfigError: If the agent configuration is invalid.
-            ProviderError: If the LLM provider cannot be configured.
-        """
         self._afm = afm
         self._base_model = model or create_model_provider(afm.metadata.model)
         self._model = self._base_model  # Will be updated with tools when connected
@@ -92,14 +61,6 @@ class Agent:
         self._signature = self._get_signature()
 
     async def __aenter__(self) -> "Agent":
-        """Connect to MCP servers and prepare tools.
-
-        Returns:
-            Self with MCP connections established.
-
-        Raises:
-            MCPConnectionError: If connection to any MCP server fails.
-        """
         await self.connect()
         return self
 
@@ -109,25 +70,10 @@ class Agent:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """Disconnect from MCP servers.
-
-        Args:
-            exc_type: Exception type if an exception occurred.
-            exc_val: Exception value if an exception occurred.
-            exc_tb: Exception traceback if an exception occurred.
-        """
         await self.disconnect()
 
     async def connect(self) -> None:
-        """Connect to MCP servers and load tools.
-
-        This method is called automatically when using the agent as an
-        async context manager. Call it explicitly if you need to manage
-        the connection lifecycle manually.
-
-        Raises:
-            MCPConnectionError: If connection to any MCP server fails.
-        """
+        """Connect to MCP servers and load tools."""
         if self._connected:
             return
 
@@ -145,12 +91,7 @@ class Agent:
         self._connected = True
 
     async def disconnect(self) -> None:
-        """Disconnect from MCP servers and clear tools.
-
-        This method is called automatically when exiting the async context
-        manager. Call it explicitly if you need to manage the connection
-        lifecycle manually.
-        """
+        """Disconnect from MCP servers and clear tools."""
         if not self._connected:
             return
 
@@ -164,31 +105,23 @@ class Agent:
             logger.info("Disconnected from MCP servers")
 
     def _get_all_tools(self) -> list[BaseTool]:
-        """Get all available tools (external + MCP).
 
-        Returns:
-            Combined list of all tools.
-        """
         return self._external_tools + self._mcp_tools
 
     @property
     def afm(self) -> AFMRecord:
-        """The underlying AFM record."""
         return self._afm
 
     @property
     def name(self) -> str:
-        """The agent's name from metadata, or a default."""
         return self._afm.metadata.name or "AFM Agent"
 
     @property
     def description(self) -> str | None:
-        """The agent's description from metadata."""
         return self._afm.metadata.description
 
     @property
     def system_prompt(self) -> str:
-        """Build the system prompt from Role and Instructions."""
         return f"""# Role
 
 {self._afm.role}
@@ -199,79 +132,42 @@ class Agent:
 
     @property
     def max_iterations(self) -> int | None:
-        """The maximum iterations setting from metadata."""
         return self._afm.metadata.max_iterations
 
     @property
     def tools(self) -> list[BaseTool]:
-        """Get all available tools.
-
-        Note: MCP tools are only available after calling connect() or
-        entering the async context manager.
-        """
         return self._get_all_tools()
 
     @property
     def is_connected(self) -> bool:
-        """Check if MCP connections are established."""
         return self._connected
 
     @property
     def has_mcp_config(self) -> bool:
-        """Check if the agent has MCP servers configured."""
         return self._mcp_manager is not None
 
     @property
     def signature(self) -> Signature:
-        """The agent's input/output signature for validation."""
         return self._signature
 
     def _get_primary_interface(self) -> Interface | None:
-        """Get the primary interface from metadata.
-
-        Returns the first interface, or None if no interfaces are defined.
-        """
         interfaces = self._afm.metadata.interfaces
         if interfaces and len(interfaces) > 0:
             return interfaces[0]
         return None
 
     def _get_signature(self) -> Signature:
-        """Get the signature for input/output validation.
-
-        Returns the signature from the primary interface, or a default
-        string-to-string signature if no interface is defined.
-        """
         if self._interface is not None:
             return self._interface.signature
         # Default: string input/output
         return Signature()
 
     def _get_session_history(self, session_id: str) -> list[HumanMessage | AIMessage]:
-        """Get or create the message history for a session.
-
-        Args:
-            session_id: The session identifier.
-
-        Returns:
-            The list of messages for the session.
-        """
         if session_id not in self._sessions:
             self._sessions[session_id] = []
         return self._sessions[session_id]
 
     def _prepare_input(self, input_data: str | dict[str, Any]) -> str:
-        """Prepare and validate input data.
-
-        Args:
-            input_data: The user input (string or dict).
-
-        Returns:
-            The input as a string suitable for the LLM.
-
-        Raises:
-            InputValidationError: If input doesn't match the signature schema.
-        """
         input_schema = self._signature.input
 
         # Validate input
@@ -287,15 +183,6 @@ class Agent:
         user_input: str,
         session_history: list[HumanMessage | AIMessage],
     ) -> list[SystemMessage | HumanMessage | AIMessage | ToolMessage]:
-        """Build the message list for the LLM.
-
-        Args:
-            user_input: The prepared user input string.
-            session_history: The conversation history for this session.
-
-        Returns:
-            The complete list of messages to send to the LLM.
-        """
         messages: list[SystemMessage | HumanMessage | AIMessage | ToolMessage] = [
             SystemMessage(content=self.system_prompt)
         ]
@@ -315,14 +202,6 @@ class Agent:
         return messages
 
     def _extract_response_content(self, response: Any) -> str:
-        """Extract string content from LLM response.
-
-        Args:
-            response: The response from the LLM.
-
-        Returns:
-            The response content as a string.
-        """
         if isinstance(response, AIMessage):
             content = response.content
         else:
@@ -544,38 +423,19 @@ class Agent:
             raise AgentError(f"Agent execution failed: {e}") from e
 
     def clear_history(self, session_id: str = "default") -> None:
-        """Clear the conversation history for a session.
-
-        Args:
-            session_id: The session ID to clear history for.
-        """
         if session_id in self._sessions:
             del self._sessions[session_id]
 
     def clear_all_history(self) -> None:
-        """Clear conversation history for all sessions."""
         self._sessions.clear()
 
     def get_session_ids(self) -> list[str]:
-        """Get all active session IDs.
-
-        Returns:
-            List of session IDs that have conversation history.
-        """
         return list(self._sessions.keys())
 
     def get_history(
         self,
         session_id: str = "default",
     ) -> list[dict[str, str]]:
-        """Get the conversation history for a session.
-
-        Args:
-            session_id: The session ID to get history for.
-
-        Returns:
-            List of message dicts with 'role' and 'content' keys.
-        """
         history = self._get_session_history(session_id)
         result = []
         for msg in history:

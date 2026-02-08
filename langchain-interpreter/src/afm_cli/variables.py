@@ -118,14 +118,7 @@ def resolve_variables(content: str) -> str:
 
 
 def contains_http_variable(content: str) -> bool:
-    """Check if content contains any http: variable references.
-
-    Args:
-        content: String to check.
-
-    Returns:
-        True if content contains ${http:...}, False otherwise.
-    """
+    """Check if content contains any http: variable references."""
     return "${http:" in content
 
 
@@ -257,10 +250,7 @@ def _signature_contains_http_variable(signature: Signature) -> bool:
 
 
 def _json_schema_contains_http_variable(schema: JSONSchema) -> bool:
-    """Check if JSON schema contains http: variables.
-
-    Checks all fields including extra fields (JSONSchema uses extra="allow").
-    """
+    """Check if JSON schema contains http: variables."""
     # Dump all fields and recursively check them
     schema_dict = schema.model_dump()
 

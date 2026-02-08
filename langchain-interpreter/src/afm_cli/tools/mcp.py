@@ -1,20 +1,7 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""MCP (Model Context Protocol) integration for AFM agents.
-
-This module provides classes for connecting to MCP servers and exposing their
-tools to LangChain-based agents.
-
-Example:
-    >>> from afm_cli import parse_afm_file
-    >>> from afm_cli.tools import MCPManager
-    >>>
-    >>> afm = parse_afm_file("agent_with_tools.afm.md")
-    >>> manager = MCPManager.from_afm(afm)
-    >>> if manager:
-    ...     tools = await manager.get_tools()
-"""
+"""MCP (Model Context Protocol) integration for AFM agents."""
 
 from __future__ import annotations
 
@@ -42,11 +29,6 @@ from ..models import (
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Authentication Helpers
-# =============================================================================
-
-
 class BearerAuth(httpx.Auth):
     """Bearer token authentication for httpx."""
 
@@ -59,10 +41,7 @@ class BearerAuth(httpx.Auth):
 
 
 class ApiKeyAuth(httpx.Auth):
-    """API key authentication for httpx.
-
-    By default, adds the API key as an Authorization header.
-    """
+    """API key authentication for httpx."""
 
     def __init__(self, api_key: str, header_name: str = "Authorization") -> None:
         self.api_key = api_key
@@ -74,17 +53,7 @@ class ApiKeyAuth(httpx.Auth):
 
 
 def build_auth_headers(auth: ClientAuthentication | None) -> dict[str, str]:
-    """Build HTTP headers from authentication configuration.
-
-    Args:
-        auth: The authentication configuration from AFM.
-
-    Returns:
-        Dictionary of HTTP headers for authentication.
-
-    Raises:
-        MCPAuthenticationError: If the auth type is unsupported or credentials are missing.
-    """
+    """Build HTTP headers from authentication configuration."""
     if auth is None:
         return {}
 
@@ -120,17 +89,7 @@ def build_auth_headers(auth: ClientAuthentication | None) -> dict[str, str]:
 
 
 def build_httpx_auth(auth: ClientAuthentication | None) -> httpx.Auth | None:
-    """Build httpx Auth instance from authentication configuration.
-
-    Args:
-        auth: The authentication configuration from AFM.
-
-    Returns:
-        httpx.Auth instance or None if no auth.
-
-    Raises:
-        MCPAuthenticationError: If the auth type is unsupported or credentials are missing.
-    """
+    """Build httpx Auth instance from authentication configuration."""
     if auth is None:
         return None
 
@@ -160,11 +119,6 @@ def build_httpx_auth(auth: ClientAuthentication | None) -> httpx.Auth | None:
 
     else:
         raise MCPAuthenticationError(f"Unsupported authentication type: {auth_type}")
-
-
-# =============================================================================
-# Tool Filtering
-# =============================================================================
 
 
 def filter_tools(
@@ -214,20 +168,11 @@ def filter_tools(
     return [tool for tool in tools if tool.name in allowed_set]
 
 
-# =============================================================================
-# MCP Client
-# =============================================================================
-
-
 class MCPClient:
     """Client for a single MCP server connection.
 
     This class wraps the langchain-mcp-adapters client for a single server,
     handling authentication and tool filtering as specified in the AFM config.
-
-    Example:
-        >>> client = MCPClient.from_mcp_server(mcp_server_config)
-        >>> tools = await client.get_tools()
     """
 
     def __init__(
@@ -237,14 +182,7 @@ class MCPClient:
         authentication: ClientAuthentication | None = None,
         tool_filter: ToolFilter | None = None,
     ) -> None:
-        """Initialize an MCP client.
-
-        Args:
-            name: Unique name for this server connection.
-            url: The HTTP URL of the MCP server.
-            authentication: Optional authentication configuration.
-            tool_filter: Optional tool filtering configuration.
-        """
+        """Initialize an MCP client."""
         self.name = name
         self.url = url
         self.authentication = authentication
@@ -253,22 +191,11 @@ class MCPClient:
 
     @classmethod
     def from_mcp_server(cls, server: MCPServer) -> "MCPClient":
-        """Create an MCPClient from an AFM MCPServer configuration.
-
-        Args:
-            server: The MCPServer configuration from AFM.
-
-        Returns:
-            Configured MCPClient instance.
-
-        Raises:
-            MCPError: If the transport type is not supported.
-        """
         transport = server.transport
 
         if transport.type != "http":
             raise MCPError(
-                f"Unsupported transport type: {transport.type}. Only 'http' is supported.",
+                f"Unsupported transport type: {transport.type}. Only 'http' is supported for now.",
                 server_name=server.name,
             )
 
@@ -280,11 +207,6 @@ class MCPClient:
         )
 
     def _build_connection_config(self) -> StreamableHttpConnection:
-        """Build the connection configuration for langchain-mcp-adapters.
-
-        Returns:
-            StreamableHttpConnection configuration dict.
-        """
         config: StreamableHttpConnection = {
             "transport": "streamable_http",
             "url": self.url,
@@ -298,14 +220,6 @@ class MCPClient:
         return config
 
     async def get_tools(self) -> list[BaseTool]:
-        """Get LangChain tools from this MCP server.
-
-        Returns:
-            List of LangChain BaseTool instances.
-
-        Raises:
-            MCPConnectionError: If connection to the server fails.
-        """
         try:
             # Create a client for just this server
             client = MultiServerMCPClient({self.name: self._build_connection_config()})
@@ -330,29 +244,15 @@ class MCPClient:
             ) from e
 
 
-# =============================================================================
-# MCP Manager
-# =============================================================================
-
-
 class MCPManager:
     """Manager for multiple MCP server connections.
 
     This class manages connections to multiple MCP servers and provides
     aggregated access to all tools.
-
-    Example:
-        >>> manager = MCPManager.from_afm(afm_record)
-        >>> if manager:
-        ...     tools = await manager.get_tools()
     """
 
     def __init__(self, servers: list[MCPServer]) -> None:
-        """Initialize the MCP manager.
-
-        Args:
-            servers: List of MCPServer configurations from AFM.
-        """
+        """Initialize the MCP manager."""
         self._servers = servers
         self._clients: list[MCPClient] = []
         self._tools: list[BaseTool] | None = None
@@ -368,14 +268,6 @@ class MCPManager:
 
     @classmethod
     def from_afm(cls, afm: AFMRecord) -> "MCPManager | None":
-        """Create an MCPManager from an AFM record.
-
-        Args:
-            afm: The parsed AFM record.
-
-        Returns:
-            MCPManager instance, or None if no MCP servers are configured.
-        """
         tools_config = afm.metadata.tools
         if tools_config is None:
             return None
@@ -392,25 +284,13 @@ class MCPManager:
         return [client.name for client in self._clients]
 
     def _build_connections(self) -> dict[str, Any]:
-        """Build the connections dict for MultiServerMCPClient.
-
-        Returns:
-            Dictionary mapping server names to connection configs.
-        """
         connections: dict[str, Any] = {}
         for client in self._clients:
             connections[client.name] = client._build_connection_config()
         return connections
 
     async def get_tools(self) -> list[BaseTool]:
-        """Get all LangChain tools from all connected MCP servers.
-
-        Returns:
-            Combined list of tools from all servers.
-
-        Raises:
-            MCPConnectionError: If connection to any server fails.
-        """
+        """Get all LangChain tools from all connected MCP servers."""
         if self._tools is not None:
             return self._tools
 

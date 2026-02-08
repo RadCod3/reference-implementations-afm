@@ -11,11 +11,6 @@ from typing import Annotated, Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-# =============================================================================
-# Provider and Model Configuration
-# =============================================================================
-
-
 class Provider(BaseModel):
     """Agent provider information."""
 
@@ -72,11 +67,6 @@ class Model(BaseModel):
     authentication: ClientAuthentication | None = None
 
 
-# =============================================================================
-# Transport and MCP Tools
-# =============================================================================
-
-
 class TransportType(str, Enum):
     """Supported transport types for MCP connections."""
 
@@ -120,11 +110,6 @@ class Tools(BaseModel):
     mcp: list[MCPServer] | None = None
 
 
-# =============================================================================
-# JSON Schema and Signatures
-# =============================================================================
-
-
 class JSONSchema(BaseModel):
     """JSON Schema definition for interface signatures.
 
@@ -149,9 +134,7 @@ class Signature(BaseModel):
     output: JSONSchema = Field(default_factory=lambda: JSONSchema(type="string"))
 
 
-# =============================================================================
-# Interface Exposure
-# =============================================================================
+#
 
 
 class HTTPExposure(BaseModel):
@@ -170,11 +153,6 @@ class Exposure(BaseModel):
     http: HTTPExposure | None = None
 
 
-# =============================================================================
-# Webhook Subscription
-# =============================================================================
-
-
 class Subscription(BaseModel):
     """Webhook subscription configuration."""
 
@@ -186,11 +164,6 @@ class Subscription(BaseModel):
     callback: str | None = None
     secret: str | None = None
     authentication: ClientAuthentication | None = None
-
-
-# =============================================================================
-# Interface Types
-# =============================================================================
 
 
 class InterfaceType(str, Enum):
@@ -243,11 +216,6 @@ Interface = Annotated[
 ]
 
 
-# =============================================================================
-# Agent Metadata and AFM Record
-# =============================================================================
-
-
 class AgentMetadata(BaseModel):
     """Complete YAML frontmatter content from an AFM file.
 
@@ -283,11 +251,6 @@ class AFMRecord(BaseModel):
     metadata: AgentMetadata
     role: str
     instructions: str
-
-
-# =============================================================================
-# Template Types (for webhook prompt compilation)
-# =============================================================================
 
 
 class LiteralSegment(BaseModel):
@@ -342,22 +305,8 @@ class CompiledTemplate(BaseModel):
     segments: tuple[TemplateSegment, ...]
 
 
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-
 def get_filtered_tools(tool_filter: ToolFilter | None) -> list[str] | None:
-    """Apply tool filtering based on allow/deny lists.
-
-    Returns the list of allowed tools, or None if no filtering is applied.
-
-    Filter logic:
-    - If no filter or empty filter: return None (all tools allowed)
-    - If only allow: return allow list
-    - If only deny: return None (deny applied by caller)
-    - If both: return allow list minus deny list
-    """
+    """Apply tool filtering based on allow/deny lists."""
     if tool_filter is None:
         return None
 

@@ -1,17 +1,7 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Command-line interface for the AFM interpreter.
-
-This module provides the `afm` command for running AFM agents from the terminal.
-It supports multiple interface types and can run them concurrently.
-
-Usage:
-    afm agent.afm.md
-    afm agent.afm.md --port 8080
-    afm agent.afm.md --dry-run
-    afm agent.afm.md --no-console
-"""
+"""Command-line interface for the AFM interpreter."""
 
 from __future__ import annotations
 
@@ -164,10 +154,6 @@ def create_unified_app(
     webchat_path = get_http_path(webchat_interface) if webchat_interface else None
     webhook_path = get_http_path(webhook_interface) if webhook_interface else None
 
-    # ==========================================================================
-    # Common Endpoints
-    # ==========================================================================
-
     @app.get("/")
     async def root_info() -> dict[str, Any]:
         """Get agent metadata."""
@@ -185,10 +171,6 @@ def create_unified_app(
     async def health_check() -> dict[str, str]:
         """Health check endpoint."""
         return {"status": "ok"}
-
-    # ==========================================================================
-    # Include Interface Routers
-    # ==========================================================================
 
     if webchat_interface is not None:
         webchat_router = create_webchat_router(
@@ -210,11 +192,6 @@ def create_unified_app(
         app.state.secret = secret
 
     return app
-
-
-# =============================================================================
-# Validation Output
-# =============================================================================
 
 
 def format_validation_output(afm: AFMRecord) -> str:
@@ -282,11 +259,6 @@ def format_validation_output(afm: AFMRecord) -> str:
     return "\n".join(lines)
 
 
-# =============================================================================
-# Interface Extraction
-# =============================================================================
-
-
 def extract_interfaces(
     afm: AFMRecord,
 ) -> tuple[
@@ -330,11 +302,6 @@ def extract_interfaces(
         )
 
     return consolechat, webchat, webhook
-
-
-# =============================================================================
-# Main CLI Command
-# =============================================================================
 
 
 @click.command()
@@ -382,16 +349,6 @@ def main(
     The agent will start all interfaces defined in the AFM file.
     HTTP interfaces (webchat, webhook) run on the specified port.
     Console chat runs interactively in the terminal.
-
-    Examples:
-
-        afm agent.afm.md
-
-        afm agent.afm.md --port 8080
-
-        afm agent.afm.md --dry-run
-
-        afm agent.afm.md --no-console
     """
     # Configure logging
     log_level = logging.DEBUG if verbose else logging.INFO

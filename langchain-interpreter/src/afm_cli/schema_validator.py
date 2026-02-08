@@ -57,15 +57,6 @@ def json_schema_to_dict(schema: JSONSchema) -> dict[str, Any]:
 
 
 def validate_input(data: Any, schema: JSONSchema) -> None:
-    """Validate input data against an input schema.
-
-    Args:
-        data: The input data to validate.
-        schema: The JSONSchema to validate against.
-
-    Raises:
-        InputValidationError: If the data doesn't match the schema.
-    """
     schema_dict = json_schema_to_dict(schema)
     try:
         jsonschema.validate(instance=data, schema=schema_dict)
@@ -75,15 +66,6 @@ def validate_input(data: Any, schema: JSONSchema) -> None:
 
 
 def validate_output(data: Any, schema: JSONSchema) -> None:
-    """Validate output data against an output schema.
-
-    Args:
-        data: The output data to validate.
-        schema: The JSONSchema to validate against.
-
-    Raises:
-        OutputValidationError: If the data doesn't match the schema.
-    """
     schema_dict = json_schema_to_dict(schema)
     try:
         jsonschema.validate(instance=data, schema=schema_dict)
@@ -93,18 +75,6 @@ def validate_output(data: Any, schema: JSONSchema) -> None:
 
 
 def extract_json_from_response(response: str) -> str:
-    """Extract JSON content from an LLM response.
-
-    The LLM may wrap JSON in markdown code blocks. This function extracts
-    the JSON content from such blocks, or returns the response as-is if
-    no code block is found.
-
-    Args:
-        response: The raw LLM response string.
-
-    Returns:
-        The extracted JSON string.
-    """
     match = JSON_BLOCK_PATTERN.search(response)
     if match:
         return match.group(1).strip()
@@ -120,22 +90,6 @@ def coerce_output_to_schema(
     response: str,
     schema: JSONSchema,
 ) -> Any:
-    """Parse and validate an LLM response against an output schema.
-
-    For string schemas, returns the response as-is.
-    For other schemas (object, array, number, etc.), attempts to parse
-    the response as JSON and validate it.
-
-    Args:
-        response: The raw LLM response string.
-        schema: The expected output schema.
-
-    Returns:
-        The validated output data (string for string schemas, parsed JSON otherwise).
-
-    Raises:
-        OutputValidationError: If the response cannot be parsed or doesn't match the schema.
-    """
     # String type - return as-is
     if schema.type == "string":
         return response

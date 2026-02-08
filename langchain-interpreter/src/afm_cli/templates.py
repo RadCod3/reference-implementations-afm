@@ -10,7 +10,6 @@ in webhook prompt templates.
 from __future__ import annotations
 
 import json
-import re
 from typing import Any
 
 from .exceptions import (
@@ -25,9 +24,6 @@ from .models import (
     PayloadVariable,
     TemplateSegment,
 )
-
-# Pattern to match ${...} variable syntax
-VARIABLE_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
 
 def compile_template(template: str) -> CompiledTemplate:
@@ -173,13 +169,7 @@ def _handle_payload_variable(
     parts: list[str],
     segment: PayloadVariable,
 ) -> None:
-    """Handle a payload variable by extracting and converting the value.
-
-    Args:
-        payload: The JSON payload.
-        parts: List to append the result to.
-        segment: The PayloadVariable segment.
-    """
+    """Handle a payload variable by extracting and converting the value."""
     if segment.path == "":
         # Entire payload
         parts.append(json.dumps(payload))
@@ -204,13 +194,7 @@ def _handle_header_variable(
     parts: list[str],
     segment: HeaderVariable,
 ) -> None:
-    """Handle a header variable by extracting the header value.
-
-    Args:
-        headers: HTTP headers (case-insensitive lookup).
-        parts: List to append the result to.
-        segment: The HeaderVariable segment.
-    """
+    """Handle a header variable by extracting the header value."""
     if headers is None:
         raise TemplateEvaluationError(
             f"Cannot resolve header variable '${{http:header.{segment.name}}}': "
@@ -276,18 +260,7 @@ def access_json_field(payload: Any, path: str) -> Any:
 
 
 def _handle_bracket_access(current: Any, remaining: str) -> tuple[Any, str]:
-    """Handle bracket notation access like ['field'] or [0].
-
-    Args:
-        current: Current value being accessed.
-        remaining: Remaining path string starting with '['.
-
-    Returns:
-        Tuple of (accessed value, remaining path).
-
-    Raises:
-        JSONAccessError: If bracket notation is invalid.
-    """
+    """Handle bracket notation access like ['field'] or [0]."""
     # Find closing bracket
     close_bracket = remaining.find("]")
     if close_bracket == -1:
@@ -340,18 +313,7 @@ def _handle_bracket_access(current: Any, remaining: str) -> tuple[Any, str]:
 
 
 def _handle_dot_notation(current: Any, remaining: str) -> tuple[Any, str]:
-    """Handle dot notation access for field.nested or field[0] patterns.
-
-    Args:
-        current: Current value being accessed.
-        remaining: Remaining path string.
-
-    Returns:
-        Tuple of (accessed value, remaining path).
-
-    Raises:
-        JSONAccessError: If field access fails.
-    """
+    """Handle dot notation access for field.nested or field[0] patterns."""
     # Find next delimiter (., [, or end of string)
     dot_pos = remaining.find(".")
     bracket_pos = remaining.find("[")
