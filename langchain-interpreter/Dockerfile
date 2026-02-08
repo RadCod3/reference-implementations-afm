@@ -12,14 +12,14 @@ ENV UV_NO_DEV=1
 # Change the working directory to the `app` directory
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies first (for better caching)
+COPY uv.lock pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project --no-editable
 
 # Copy the source code into the builder stage
 COPY src/ ./src/
+COPY README.md ./
 
 # Sync the project (installs the current project into the venv)
 RUN --mount=type=cache,target=/root/.cache/uv \
