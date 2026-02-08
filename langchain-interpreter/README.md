@@ -1,20 +1,21 @@
-# AFM CLI
+# AFM LangChain Interpreter
 
-The **AFM CLI** (`afm`) is a reference implementation of an interpreter for [**Agent-Flavored Markdown (AFM)**](https://wso2.github.io/agent-flavored-markdown/). It allows you to run AI agents defined in simple Markdown files locally or as web services.
-
-Built on top of [LangChain](https://www.langchain.com/), this interpreter provides a robust and extensible runtime for your agents.
-
-AFM is a standard for defining AI agents using a mix of YAML front-matter (configuration) and Markdown (instructions), making agents portable, readable, and easy to version control.
+A LangChain-based reference implementation of an interpreter for [Agent-Flavored Markdown (AFM)](https://github.com/wso2/agent-flavored-markdown) files.
 
 ## Features
 
-*   **Run Agents anywhere**: Execute `.afm.md` files directly from your terminal.
-*   **Multiple Interfaces**:
-    *   **Console Chat**: Interactive CLI chat for testing and debugging.
-    *   **Web Chat**: Exposes a REST API and can serve a web UI.
-    *   **Webhooks**: Supports event-driven architectures with WebSub integration.
-*   **Tool Support**: Built-in support for **Model Context Protocol (MCP)** to connect agents to external data and tools.
-*   **Validation**: Dry-run mode to validate your agent definitions before execution.
+- **Support for all interface types:**
+  - Console chat (interactive CLI)
+  - Web chat (HTTP API + optional UI)
+  - Webhook (WebSub-based event handling)
+- **Multi-interface agents** - run multiple interfaces simultaneously
+- **MCP support** for tools (Model Context Protocol)
+- **Validation** - dry-run mode to validate AFM definitions
+
+## Prerequisites
+
+- [Python](https://www.python.org/) 3.12 or later.
+- [uv](https://docs.astral.sh/uv/) for dependency management.
 
 ## Installation
 
@@ -28,128 +29,66 @@ pipx install afm-cli
 
 ### Using pip
 
-To install it as a library or in a virtual environment:
-
 ```bash
 pip install afm-cli
 ```
 
 ## Quick Start
 
-1.  **Create an AFM file** (e.g., `my_agent.afm.md`):
+```bash
+# Set your API Key
+export OPENAI_API_KEY="your-api-key-here"
 
-    ```markdown
-    ---
-    spec_version: "0.3.0"
-    name: "Helpful Assistant"
-    model:
-      provider: openai
-      name: gpt-4o
-    interfaces:
-      - type: consolechat
-    ---
+# Run with an AFM file
+afm path/to/agent.afm.md
+```
 
-    # Role
-    You are a helpful AI assistant.
+## Configuration
 
-    # Instructions
-    Answer the user's questions concisely.
-    ```
+Configuration via environment variables or CLI options:
 
-2.  **Set your API Key**:
+- `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc. (Required based on provider)
+- HTTP port can be set via `-p` or `--port` (default: 8000)
 
-    ```bash
-    export OPENAI_API_KEY="your-api-key-here"
-    ```
-
-3.  **Run the agent**:
-
-    ```bash
-    afm my_agent.afm.md
-    ```
-
-3.  **Chat!** You can now interact with your agent in the terminal.
-
-## Usage
+## Running with Docker
 
 ```bash
-Usage: afm [OPTIONS] FILE
+# Build the image
+docker build -t afm-langchain-interpreter .
 
-  Run an AFM agent from FILE.
-
-Options:
-  -p, --port INTEGER  HTTP port for web interfaces (default: 8000)
-  -H, --host TEXT     Host to bind HTTP server to (default: 0.0.0.0)
-  --dry-run           Validate AFM file without running the agent
-  --no-console        Skip consolechat interface even if defined
-  -v, --verbose       Enable verbose/debug logging
-  --version           Show the version and exit.
-  --help              Show this message and exit.
+# Run with an AFM file mounted and API key
+docker run -v $(pwd)/path/to/agent.afm.md:/app/agent.afm.md \
+  -e OPENAI_API_KEY=$OPENAI_API_KEY \
+  -p 8000:8000 \
+  afm-langchain-interpreter afm /app/agent.afm.md
 ```
 
-## AFM File Format
+## Testing
 
-An AFM file consists of **YAML Front Matter** and a **Markdown Body**.
-
-### Front Matter
-Contains configuration:
-*   **Metadata**: Name, version, description.
-*   **Model**: Provider (OpenAI, Anthropic, etc.) and model name.
-*   **Interfaces**: How the agent is exposed (console, web, webhook).
-*   **Tools**: MCP server connections.
-
-### Markdown Body
-Contains the logic:
-*   **# Role**: Who the agent is.
-*   **# Instructions**: What the agent should do.
-
-See `afm-samples/` directory for more complex examples including tool usage.
-
-## Interfaces
-
-### Console Chat
-Run interactive sessions in your terminal.
-```yaml
-interfaces:
-  - type: consolechat
+```bash
+uv run pytest
 ```
 
-### Web Chat
-Exposes a FastAPI endpoint for chat.
-```yaml
-interfaces:
-  - type: webchat
-    exposure:
-      http:
-        path: /chat
+## Project Structure
+
 ```
-Run with `afm agent.afm.md --port 8080`.
-
-### Webhook
-Processes incoming HTTP requests, suitable for event-driven workflows.
-```yaml
-interfaces:
-  - type: webhook
-    subscription:
-      protocol: websub
-      topic: my-topic
-      hub: http://my-hub.com
+langchain-interpreter/
+├── src/afm_cli/
+│   ├── interfaces/        # Interface implementations (console, web, webhook)
+│   ├── tools/             # Tool support (MCP server)
+│   ├── resources/         # Static assets (web UI)
+│   ├── agent.py           # Core agent logic
+│   ├── cli.py             # CLI entry point
+│   ├── parser.py          # AFM file parsing
+│   ├── models.py          # Model configuration
+│   ├── providers.py       # LLM provider handling
+│   └── templates.py       # Prompt templates
+├── tests/                 # Unit and integration tests
+├── afm-samples/           # Example AFM definitions
+├── Dockerfile             # Container build
+├── pyproject.toml         # Python project configuration
+└── uv.lock                # Dependency lock file
 ```
-
-## Development
-
-To contribute to this project:
-
-1.  Clone the repository.
-2.  Install `uv` (modern Python package manager).
-3.  Install dependencies:
-    ```bash
-    uv sync
-    ```
-4.  Run tests:
-    ```bash
-    uv run pytest
-    ```
 
 ## License
 

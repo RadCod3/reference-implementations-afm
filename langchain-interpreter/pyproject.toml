@@ -3,7 +3,6 @@ name = "afm-cli"
 version = "0.1.1"
 description = "AFM (Agent-Flavored Markdown) interpreter using LangChain"
 readme = "README.md"
-authors = [{ name = "Radith Samarakoon" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3.11",
