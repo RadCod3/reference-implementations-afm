@@ -306,14 +306,19 @@ def create_webhook_router(
         if hub_mode in ("subscribe", "unsubscribe"):
             # If we have a subscriber, verify the topic matches
             if websub_subscriber is not None:
-                if hub_topic != websub_subscriber.topic:
-                    raise HTTPException(status_code=404, detail="Topic mismatch")
-                # Mark as verified on successful verification
-                if hub_mode == "subscribe":
-                    websub_subscriber._verified = True
-            elif websub_subscriber is None and hasattr(
-                request.app.state, "websub_subscriber"
-            ):
+                # Use subscriber's verification logic
+                challenge = websub_subscriber.verify_challenge(
+                    hub_mode,
+                    hub_topic,
+                    hub_challenge,
+                    lease_seconds=hub_lease_seconds,
+                )
+                if challenge:
+                    return PlainTextResponse(content=challenge)
+                # Verification failed (e.g. topic mismatch)
+                raise HTTPException(status_code=404, detail="Verification failed")
+
+            elif hasattr(request.app.state, "websub_subscriber"):
                 # Subscriber was explicitly set to None - reject verification
                 raise HTTPException(status_code=404, detail="No subscriber configured")
 
