@@ -475,7 +475,7 @@ def create_webhook_app(
                 effective_host = "localhost"
 
             effective_port = port if port else 8000
-            
+
             callback_url = f"http://{effective_host}:{effective_port}{webhook_path}"
             logger.warning(
                 f"Using auto-generated WebSub callback URL: {callback_url}. "
@@ -500,7 +500,15 @@ def create_webhook_app(
             subscription_task.add_done_callback(log_task_exception)
             app.state.subscription_task = subscription_task
         yield
-        # Shutdown: Unsubscribe from WebSub hub
+        # Shutdown: Cancel pending subscription task
+        subscription_task = getattr(app.state, "subscription_task", None)
+        if subscription_task is not None and not subscription_task.done():
+            subscription_task.cancel()
+            try:
+                await subscription_task
+            except asyncio.CancelledError:
+                pass
+        # Unsubscribe from WebSub hub if verified
         if websub_subscriber and websub_subscriber.is_verified:
             await websub_subscriber.unsubscribe()
 

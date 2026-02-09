@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import httpx
 from langchain_core.tools import BaseTool
@@ -219,7 +218,6 @@ class MCPManager:
         self._servers = servers
         self._clients: list[MCPClient] = []
         self._tools: list[BaseTool] | None = None
-        self._multi_client: MultiServerMCPClient | None = None
 
         # Create clients for each server
         for server in servers:
@@ -246,12 +244,6 @@ class MCPManager:
         """Get the names of all configured servers."""
         return [client.name for client in self._clients]
 
-    def _build_connections(self) -> dict[str, Any]:
-        connections: dict[str, Any] = {}
-        for client in self._clients:
-            connections[client.name] = client._build_connection_config()
-        return connections
-
     async def get_tools(self) -> list[BaseTool]:
         """Get all LangChain tools from all connected MCP servers."""
         if self._tools is not None:
@@ -274,7 +266,11 @@ class MCPManager:
                 f"Failed to connect to any MCP server: {'; '.join(errors)}"
             )
 
-        self._tools = all_tools
+        # Only cache if all servers succeeded; partial results are not
+        # cached so that failed servers can be retried on the next call.
+        if not errors:
+            self._tools = all_tools
+
         return all_tools
 
     def clear_cache(self) -> None:

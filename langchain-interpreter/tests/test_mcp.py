@@ -517,6 +517,66 @@ class TestMCPManager:
 
         assert manager._tools is None
 
+    @pytest.mark.asyncio
+    async def test_get_tools_partial_failure_not_cached(self):
+        """Partial failures should not be cached, allowing retry on next call."""
+        servers = [
+            make_mcp_server(name="server1"),
+            make_mcp_server(name="server2"),
+        ]
+        manager = MCPManager(servers)
+
+        # First call: server1 succeeds, server2 fails
+        with (
+            patch.object(
+                manager._clients[0], "get_tools", return_value=[make_mock_tool("tool1")]
+            ),
+            patch.object(
+                manager._clients[1],
+                "get_tools",
+                side_effect=MCPConnectionError(
+                    "Connection failed", server_name="server2"
+                ),
+            ),
+        ):
+            tools = await manager.get_tools()
+            assert len(tools) == 1  # only tool1 from server1
+            assert tools[0].name == "tool1"
+
+        # Second call: both succeed (server2 recovered)
+        with (
+            patch.object(
+                manager._clients[0], "get_tools", return_value=[make_mock_tool("tool1")]
+            ) as mock_get1_retry,
+            patch.object(
+                manager._clients[1], "get_tools", return_value=[make_mock_tool("tool2")]
+            ) as mock_get2_retry,
+        ):
+            tools = await manager.get_tools()
+            assert len(tools) == 2  # both tools now
+            assert tools[0].name == "tool1"
+            assert tools[1].name == "tool2"
+            # Verify that get_tools was called again on both servers (not cached)
+            mock_get1_retry.assert_called_once()
+            mock_get2_retry.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_tools_full_success_is_cached(self):
+        """Full success should be cached; second call skips server queries."""
+        servers = [make_mcp_server(name="server1")]
+        manager = MCPManager(servers)
+
+        with patch.object(
+            manager._clients[0], "get_tools", return_value=[make_mock_tool("tool1")]
+        ) as mock_get:
+            # First call
+            tools1 = await manager.get_tools()
+            # Second call
+            tools2 = await manager.get_tools()
+
+            assert tools1 is tools2  # same cached object
+            mock_get.assert_called_once()  # only called once (cached)
+
 
 # =============================================================================
 # Exception Tests

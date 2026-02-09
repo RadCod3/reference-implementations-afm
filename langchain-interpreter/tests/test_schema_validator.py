@@ -380,3 +380,49 @@ class TestBuildOutputSchemaInstruction:
         instruction = build_output_schema_instruction(schema)
         assert '"type": "array"' in instruction
         assert '"items"' in instruction
+
+
+class TestJsonSchemaToDictExtraFields:
+    """Tests for json_schema_to_dict handling of extra fields."""
+
+    def test_nested_json_schema_extra_field(self) -> None:
+        """Extra fields containing JSONSchema are recursively converted."""
+        # Use additionalProperties as an example of a nested JSONSchema extra field
+        schema = JSONSchema.model_construct(
+            type="object",
+            additionalProperties=JSONSchema(
+                type="string",
+                description="Additional property value",
+            ),
+        )
+        result = json_schema_to_dict(schema)
+
+        # The additionalProperties should be a dict with proper type and description
+        assert result["additionalProperties"] == {
+            "type": "string",
+            "description": "Additional property value",
+        }
+
+    def test_scalar_extra_fields_preserved(self) -> None:
+        """Scalar extra fields like enum and minimum are preserved."""
+        schema = JSONSchema.model_construct(
+            type="string",
+            enum=["option1", "option2"],
+            minimum=5,
+        )
+        result = json_schema_to_dict(schema)
+
+        assert result["enum"] == ["option1", "option2"]
+        assert result["minimum"] == 5
+
+    def test_mixed_extra_fields(self) -> None:
+        """Mix of scalar and nested JSONSchema extra fields."""
+        schema = JSONSchema.model_construct(
+            type="object",
+            enum=["type1", "type2"],
+            additionalProperties=JSONSchema(type="boolean"),
+        )
+        result = json_schema_to_dict(schema)
+
+        assert result["enum"] == ["type1", "type2"]
+        assert result["additionalProperties"] == {"type": "boolean"}

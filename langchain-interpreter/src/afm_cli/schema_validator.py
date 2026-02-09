@@ -51,7 +51,13 @@ def json_schema_to_dict(schema: JSONSchema) -> dict[str, Any]:
     )
     for key, value in extra_fields.items():
         if value is not None:
-            result[key] = value
+            # Check if the original attribute is a JSONSchema instance
+            # (model_dump serializes it to a plain dict, losing the type)
+            original = getattr(schema, key, None)
+            if isinstance(original, JSONSchema):
+                result[key] = json_schema_to_dict(original)
+            else:
+                result[key] = value
 
     return result
 

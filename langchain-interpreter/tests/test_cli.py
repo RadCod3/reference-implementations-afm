@@ -4,7 +4,7 @@
 """Tests for the CLI module."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -435,3 +435,60 @@ Test
         )
         result = runner.invoke(main, [str(bad_file), "--dry-run"])
         assert result.exit_code != 0
+
+
+# =============================================================================
+# Lifespan Tests
+# =============================================================================
+
+
+class TestUnifiedAppLifespan:
+    """Tests for unified app lifespan (startup/shutdown) behavior."""
+
+    @pytest.mark.asyncio
+    async def test_lifespan_cancels_subscription_task_on_shutdown(
+        self, sample_agent_path: Path
+    ):
+        """Verify that the subscription task is cancelled during shutdown."""
+        import asyncio
+        from afm_cli import Agent
+        from afm_cli.parser import parse_afm_file
+
+        afm = parse_afm_file(str(sample_agent_path))
+
+        with patch("afm_cli.agent.create_model_provider") as mock_provider:
+            mock_provider.return_value = MagicMock()
+            agent = Agent(afm)
+
+            webhook = WebhookInterface(
+                subscription=Subscription(
+                    protocol="websub",
+                    hub="http://hub.example.com",
+                    topic="http://topic.example.com",
+                )
+            )
+
+            app = create_unified_app(agent, webhook_interface=webhook)
+
+            # Create an async function that blocks indefinitely (simulating a long retry sleep)
+            async def blocking_subscribe(*args, **kwargs) -> None:
+                await asyncio.sleep(3600)
+
+            # Patch subscribe_with_retry and agent methods to avoid real connections
+            with (
+                patch("afm_cli.cli.subscribe_with_retry", blocking_subscribe),
+                patch.object(agent, "connect", new_callable=AsyncMock),
+                patch.object(agent, "disconnect", new_callable=AsyncMock),
+            ):
+                # Get the lifespan context manager from the app
+                lifespan = app.router.lifespan_context
+
+                async with lifespan(app):
+                    task = app.state.subscription_task
+                    assert not task.done()
+                    # Let it start
+                    await asyncio.sleep(0.01)
+
+                # After exiting the context, task should be cancelled
+                assert task.done()
+                assert task.cancelled()

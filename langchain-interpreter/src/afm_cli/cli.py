@@ -122,7 +122,15 @@ def create_unified_app(
         if startup_event is not None:
             startup_event.set()
         yield
-        # Shutdown: Unsubscribe from WebSub hub
+        # Shutdown: Cancel pending subscription task
+        subscription_task = getattr(app.state, "subscription_task", None)
+        if subscription_task is not None and not subscription_task.done():
+            subscription_task.cancel()
+            try:
+                await subscription_task
+            except asyncio.CancelledError:
+                pass
+        # Unsubscribe from WebSub hub if verified
         if websub_subscriber and websub_subscriber.is_verified:
             await websub_subscriber.unsubscribe()
 

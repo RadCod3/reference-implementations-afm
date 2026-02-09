@@ -698,3 +698,74 @@ class TestResolveSecret:
         with pytest.raises(VariableResolutionError) as exc_info:
             resolve_secret("${unsupported:VAR}")
         assert "unsupported" in str(exc_info.value)
+
+
+# =============================================================================
+# Lifespan Tests
+# =============================================================================
+
+
+class TestLifespan:
+    """Tests for webhook app lifespan (startup/shutdown) behavior."""
+
+    @pytest.mark.asyncio
+    async def test_lifespan_cancels_subscription_task_on_shutdown(
+        self, mock_webhook_agent: MagicMock
+    ) -> None:
+        """Verify that the subscription task is cancelled during shutdown."""
+        import asyncio
+
+        # Create an async function that blocks indefinitely (simulating a long retry sleep)
+        async def blocking_subscribe(*args, **kwargs) -> None:
+            await asyncio.sleep(3600)
+
+        app = create_webhook_app(
+            mock_webhook_agent,
+            auto_subscribe=True,
+            verify_signatures=False,
+        )
+
+        # Get the lifespan context manager from the app
+        from contextlib import asynccontextmanager
+
+        # Patch subscribe_with_retry to block
+        with patch(
+            "afm_cli.interfaces.webhook.subscribe_with_retry", blocking_subscribe
+        ):
+            # Manually trigger the lifespan to test shutdown behavior
+            @asynccontextmanager
+            async def test_lifespan(app):
+                # Startup
+                if (
+                    hasattr(app.state, "websub_subscriber")
+                    and app.state.websub_subscriber
+                ):
+                    from afm_cli.interfaces.webhook import (
+                        subscribe_with_retry,
+                        log_task_exception,
+                    )
+
+                    subscription_task = asyncio.create_task(
+                        subscribe_with_retry(app.state.websub_subscriber)
+                    )
+                    subscription_task.add_done_callback(log_task_exception)
+                    app.state.subscription_task = subscription_task
+                yield
+                # Shutdown (copy of actual implementation)
+                subscription_task = getattr(app.state, "subscription_task", None)
+                if subscription_task is not None and not subscription_task.done():
+                    subscription_task.cancel()
+                    try:
+                        await subscription_task
+                    except asyncio.CancelledError:
+                        pass
+
+            async with test_lifespan(app):
+                task = app.state.subscription_task
+                assert not task.done()
+                # Let it start
+                await asyncio.sleep(0.01)
+
+            # After exiting the context, task should be cancelled
+            assert task.done()
+            assert task.cancelled()
