@@ -245,6 +245,9 @@ class Agent:
             # Get session history
             session_history = self._get_session_history(session_id)
 
+            # Save the original input for history before schema augmentation
+            original_input = user_input
+
             # Build messages
             messages: list[Any] = self._build_messages(user_input, session_history)
 
@@ -310,7 +313,7 @@ class Agent:
             result = coerce_output_to_schema(response_content, output_schema)
 
             # Update session history
-            session_history.append(HumanMessage(content=user_input))
+            session_history.append(HumanMessage(content=original_input))
             session_history.append(AIMessage(content=response_content))
 
             return result
@@ -356,6 +359,9 @@ class Agent:
 
             # Get session history
             session_history = self._get_session_history(session_id)
+
+            # Save the original input for history before schema augmentation
+            original_input = user_input
 
             # Build messages
             messages: list[Any] = self._build_messages(user_input, session_history)
@@ -422,7 +428,7 @@ class Agent:
             result = coerce_output_to_schema(response_content, output_schema)
 
             # Update session history (only Human and AI messages for simplicity in get_history)
-            session_history.append(HumanMessage(content=user_input))
+            session_history.append(HumanMessage(content=original_input))
             session_history.append(AIMessage(content=response_content))
 
             return result

@@ -18,10 +18,6 @@ from textual.widgets import Footer, Header, Input, LoadingIndicator, Static
 if TYPE_CHECKING:
     from ..agent import Agent
 
-# Default prompts/messages
-DEFAULT_USER_PROMPT = "You: "
-DEFAULT_AGENT_PREFIX = "Agent: "
-
 logger = logging.getLogger(__name__)
 
 
@@ -39,19 +35,16 @@ class ChatApp(App):
         self,
         agent: Agent,
         session_id: str | None = None,
-        agent_prefix: str = DEFAULT_AGENT_PREFIX,
     ):
         """Initialize the chat app.
 
         Args:
             agent: The AFM agent instance.
             session_id: Optional session ID. If None, one is generated.
-            agent_prefix: Prefix for agent messages.
         """
         super().__init__()
         self.agent = agent
         self.session_id = session_id or str(uuid.uuid4())
-        self.agent_prefix = agent_prefix
 
     def compose(self) -> ComposeResult:
         """Compose the layout of the app."""
@@ -196,10 +189,9 @@ def run_console_chat(
     agent: Agent,
     *,
     session_id: str | None = None,
-    agent_prefix: str = DEFAULT_AGENT_PREFIX,
 ) -> None:
     """Run an interactive console chat session with the agent."""
-    app = ChatApp(agent, session_id=session_id, agent_prefix=agent_prefix)
+    app = ChatApp(agent, session_id=session_id)
     app.run()
 
 
@@ -207,8 +199,7 @@ async def async_run_console_chat(
     agent: Agent,
     *,
     session_id: str | None = None,
-    agent_prefix: str = DEFAULT_AGENT_PREFIX,
 ) -> None:
     """Async version of run_console_chat."""
-    app = ChatApp(agent, session_id=session_id, agent_prefix=agent_prefix)
+    app = ChatApp(agent, session_id=session_id)
     await app.run_async()

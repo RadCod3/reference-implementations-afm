@@ -85,9 +85,7 @@ async def test_run_console_chat(mock_agent: MagicMock) -> None:
             session_id="test-session",
         )
 
-        MockApp.assert_called_once_with(
-            mock_agent, session_id="test-session", agent_prefix="Agent: "
-        )
+        MockApp.assert_called_once_with(mock_agent, session_id="test-session")
         MockApp.return_value.run.assert_called_once()
 
 
@@ -101,12 +99,9 @@ async def test_async_run_console_chat(mock_agent: MagicMock) -> None:
         await async_run_console_chat(
             mock_agent,
             session_id="test-session",
-            agent_prefix="Agent: ",
         )
 
-        MockApp.assert_called_once_with(
-            mock_agent, session_id="test-session", agent_prefix="Agent: "
-        )
+        MockApp.assert_called_once_with(mock_agent, session_id="test-session")
         MockApp.return_value.run_async.assert_called_once()
 
 

@@ -199,6 +199,9 @@ class MCPClient:
 
             return filtered_tools
 
+        except MCPError:
+            # Re-raise MCPError subclasses (like MCPAuthenticationError) to preserve diagnostics
+            raise
         except Exception as e:
             raise MCPConnectionError(
                 f"Failed to connect: {e}",

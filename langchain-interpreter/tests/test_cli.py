@@ -451,6 +451,7 @@ class TestUnifiedAppLifespan:
     ):
         """Verify that the subscription task is cancelled during shutdown."""
         import asyncio
+        from asgi_lifespan import LifespanManager
         from afm_cli import Agent
         from afm_cli.parser import parse_afm_file
 
@@ -480,10 +481,8 @@ class TestUnifiedAppLifespan:
                 patch.object(agent, "connect", new_callable=AsyncMock),
                 patch.object(agent, "disconnect", new_callable=AsyncMock),
             ):
-                # Get the lifespan context manager from the app
-                lifespan = app.router.lifespan_context
-
-                async with lifespan(app):
+                # Use LifespanManager to properly manage the async lifespan
+                async with LifespanManager(app):
                     task = app.state.subscription_task
                     assert not task.done()
                     # Let it start

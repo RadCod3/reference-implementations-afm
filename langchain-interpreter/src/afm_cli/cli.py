@@ -93,9 +93,23 @@ def create_unified_app(
 
         if subscription.hub and subscription.topic:
             webhook_path = get_http_path(webhook_interface)
-            callback_url = (
-                subscription.callback or f"http://{host}:{port}{webhook_path}"
-            )
+
+            # Determine callback URL - use localhost for 0.0.0.0 since it's not externally routable
+            if subscription.callback:
+                callback_url = subscription.callback
+            else:
+                # Construct fallback callback URL from host/port
+                # Use localhost for 0.0.0.0 since it's not externally routable
+                if host == "0.0.0.0":
+                    effective_host = "localhost"
+                else:
+                    effective_host = host
+                callback_url = f"http://{effective_host}:{port}{webhook_path}"
+                logger.warning(
+                    f"Using auto-generated WebSub callback URL: {callback_url}. "
+                    "For production use, set subscription.callback explicitly in the AFM file."
+                )
+
             websub_subscriber = WebSubSubscriber(
                 hub=subscription.hub,
                 topic=subscription.topic,

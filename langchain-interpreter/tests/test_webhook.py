@@ -714,6 +714,7 @@ class TestLifespan:
     ) -> None:
         """Verify that the subscription task is cancelled during shutdown."""
         import asyncio
+        from asgi_lifespan import LifespanManager
 
         # Create an async function that blocks indefinitely (simulating a long retry sleep)
         async def blocking_subscribe(*args, **kwargs) -> None:
@@ -725,42 +726,11 @@ class TestLifespan:
             verify_signatures=False,
         )
 
-        # Get the lifespan context manager from the app
-        from contextlib import asynccontextmanager
-
-        # Patch subscribe_with_retry to block
+        # Patch subscribe_with_retry to block and use LifespanManager to test shutdown
         with patch(
             "afm_cli.interfaces.webhook.subscribe_with_retry", blocking_subscribe
         ):
-            # Manually trigger the lifespan to test shutdown behavior
-            @asynccontextmanager
-            async def test_lifespan(app):
-                # Startup
-                if (
-                    hasattr(app.state, "websub_subscriber")
-                    and app.state.websub_subscriber
-                ):
-                    from afm_cli.interfaces.webhook import (
-                        subscribe_with_retry,
-                        log_task_exception,
-                    )
-
-                    subscription_task = asyncio.create_task(
-                        subscribe_with_retry(app.state.websub_subscriber)
-                    )
-                    subscription_task.add_done_callback(log_task_exception)
-                    app.state.subscription_task = subscription_task
-                yield
-                # Shutdown (copy of actual implementation)
-                subscription_task = getattr(app.state, "subscription_task", None)
-                if subscription_task is not None and not subscription_task.done():
-                    subscription_task.cancel()
-                    try:
-                        await subscription_task
-                    except asyncio.CancelledError:
-                        pass
-
-            async with test_lifespan(app):
+            async with LifespanManager(app):
                 task = app.state.subscription_task
                 assert not task.done()
                 # Let it start
