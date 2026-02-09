@@ -250,6 +250,11 @@ def access_json_field(payload: Any, path: str) -> Any:
         if remaining.startswith("["):
             current, remaining = _handle_bracket_access(current, remaining)
         elif remaining.startswith("."):
+            if remaining.startswith(".."):
+                raise JSONAccessError(
+                    f"Empty field name in path: {remaining}",
+                    path=remaining,
+                )
             # Skip leading dot
             remaining = remaining[1:]
         else:

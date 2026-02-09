@@ -418,6 +418,13 @@ class TestAccessJsonField:
             _handle_dot_notation(payload, "..name")
         assert "Empty field name" in str(exc_info.value)
 
+    def test_access_json_field_double_dot(self) -> None:
+        """Test double dot in path raises error via access_json_field."""
+        payload = {"user": {"name": "Alice"}}
+        with pytest.raises(JSONAccessError) as exc_info:
+            access_json_field(payload, "user..name")
+        assert "Empty field name" in str(exc_info.value)
+
     def test_dot_bracket_empty_field_name(self) -> None:
         """Test dot followed by bracket raises error for empty field name."""
         payload = {"user": {"name": "Alice"}}
