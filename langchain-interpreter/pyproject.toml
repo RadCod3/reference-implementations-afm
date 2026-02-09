@@ -1,5 +1,5 @@
 [project]
-name = "afm-cli"
+name = "afm"
 version = "0.1.1"
 description = "AFM (Agent-Flavored Markdown) interpreter using LangChain"
 readme = "README.md"
@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.scripts]
-afm = "afm_cli.cli:main"
+afm = "afm.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.9.28,<0.10.0"]

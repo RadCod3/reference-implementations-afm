@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from afm_cli.agent import Agent
-from afm_cli.interfaces.web_chat import create_webchat_app
-from afm_cli.models import JSONSchema, Signature
+from afm.agent import Agent
+from afm.interfaces.web_chat import create_webchat_app
+from afm.models import JSONSchema, Signature
 
 
 @pytest.fixture

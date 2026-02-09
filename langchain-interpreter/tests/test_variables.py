@@ -3,8 +3,8 @@
 
 import pytest
 import os
-from afm_cli.variables import resolve_variables
-from afm_cli.exceptions import VariableResolutionError
+from afm.variables import resolve_variables
+from afm.exceptions import VariableResolutionError
 
 
 class TestResolveVariables:

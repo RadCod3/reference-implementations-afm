@@ -9,8 +9,8 @@ import pytest
 from textual.containers import VerticalScroll
 from textual.widgets import Input, Static
 
-from afm_cli.agent import Agent
-from afm_cli.interfaces.console_chat import ChatApp
+from afm.agent import Agent
+from afm.interfaces.console_chat import ChatApp
 
 
 @pytest.fixture

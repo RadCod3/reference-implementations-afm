@@ -9,7 +9,7 @@ constraints = [
 ]
 
 [[package]]
-name = "afm-cli"
+name = "afm"
 version = "0.1.1"
 source = { editable = "." }
 dependencies = [

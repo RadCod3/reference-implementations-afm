@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from afm_cli.exceptions import AFMParseError, AFMValidationError
-from afm_cli.models import ConsoleChatInterface, WebChatInterface, WebhookInterface
-from afm_cli.parser import parse_afm, parse_afm_file
+from afm.exceptions import AFMParseError, AFMValidationError
+from afm.models import ConsoleChatInterface, WebChatInterface, WebhookInterface
+from afm.parser import parse_afm, parse_afm_file
 
 
 class TestParseAfm:

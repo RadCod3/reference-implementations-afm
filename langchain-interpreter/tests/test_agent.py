@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from afm_cli.agent import Agent
-from afm_cli.models import (
+from afm.agent import Agent
+from afm.models import (
     AFMRecord,
     AgentMetadata,
     Model,
@@ -108,7 +108,7 @@ class TestSystemPrompt:
 
 
 class TestModelProviderIntegration:
-    @patch("afm_cli.agent.create_model_provider")
+    @patch("afm.agent.create_model_provider")
     def test_creates_model_from_afm_config(
         self,
         mock_create_provider: MagicMock,
@@ -133,6 +133,6 @@ class TestModelProviderIntegration:
         simple_afm: AFMRecord,
         mock_chat_model: MagicMock,
     ) -> None:
-        with patch("afm_cli.agent.create_model_provider") as mock_create:
+        with patch("afm.agent.create_model_provider") as mock_create:
             Agent(simple_afm, model=mock_chat_model)
             mock_create.assert_not_called()

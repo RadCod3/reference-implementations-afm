@@ -7,18 +7,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from afm_cli.agent import Agent
-from afm_cli.cli import (
+from afm.agent import Agent
+from afm.cli import (
     __cli_version__,
     create_unified_app,
     main,
 )
-from afm_cli.models import (
+from afm.models import (
     Subscription,
     WebChatInterface,
     WebhookInterface,
 )
-from afm_cli.parser import parse_afm_file
+from afm.parser import parse_afm_file
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ class TestCreateUnifiedApp:
         with patch.object(
             afm.metadata, "model", MagicMock(provider="openai", name="gpt-4")
         ):
-            with patch("afm_cli.agent.create_model_provider") as mock_provider:
+            with patch("afm.agent.create_model_provider") as mock_provider:
                 mock_provider.return_value = MagicMock()
                 agent = Agent(afm)
 
@@ -113,7 +113,7 @@ class TestCreateUnifiedApp:
     def test_creates_app_with_webchat(self, sample_agent_path: Path):
         afm = parse_afm_file(str(sample_agent_path))
 
-        with patch("afm_cli.agent.create_model_provider") as mock_provider:
+        with patch("afm.agent.create_model_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
 
             agent = Agent(afm)
@@ -133,7 +133,7 @@ class TestCreateUnifiedApp:
     def test_creates_app_with_webhook(self, sample_minimal_path: Path):
         afm = parse_afm_file(str(sample_minimal_path))
 
-        with patch("afm_cli.agent.create_model_provider") as mock_provider:
+        with patch("afm.agent.create_model_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
 
             agent = Agent(afm)
@@ -155,7 +155,7 @@ class TestCreateUnifiedApp:
     def test_creates_app_with_both_interfaces(self, sample_minimal_path: Path):
         afm = parse_afm_file(str(sample_minimal_path))
 
-        with patch("afm_cli.agent.create_model_provider") as mock_provider:
+        with patch("afm.agent.create_model_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
 
             agent = Agent(afm)
@@ -176,8 +176,8 @@ class TestCreateUnifiedApp:
 
 
 class TestCLIIntegration:
-    @patch("afm_cli.cli.uvicorn")
-    @patch("afm_cli.cli.Agent")
+    @patch("afm.cli.uvicorn")
+    @patch("afm.cli.Agent")
     def test_cli_starts_http_server_for_webchat(
         self,
         mock_agent_class: MagicMock,
@@ -234,7 +234,7 @@ class TestUnifiedAppLifespan:
 
         afm = parse_afm_file(str(sample_agent_path))
 
-        with patch("afm_cli.agent.create_model_provider") as mock_provider:
+        with patch("afm.agent.create_model_provider") as mock_provider:
             mock_provider.return_value = MagicMock()
             agent = Agent(afm)
 
@@ -254,7 +254,7 @@ class TestUnifiedAppLifespan:
 
             # Patch subscribe_with_retry and agent methods to avoid real connections
             with (
-                patch("afm_cli.cli.subscribe_with_retry", blocking_subscribe),
+                patch("afm.cli.subscribe_with_retry", blocking_subscribe),
                 patch.object(agent, "connect", new_callable=AsyncMock),
                 patch.object(agent, "disconnect", new_callable=AsyncMock),
             ):

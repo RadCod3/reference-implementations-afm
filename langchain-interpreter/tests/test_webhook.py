@@ -11,13 +11,13 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from afm_cli.agent import Agent
-from afm_cli.interfaces.webhook import (
+from afm.agent import Agent
+from afm.interfaces.webhook import (
     WebSubSubscriber,
     create_webhook_app,
     verify_webhook_signature,
 )
-from afm_cli.models import (
+from afm.models import (
     Exposure,
     HTTPExposure,
     JSONSchema,

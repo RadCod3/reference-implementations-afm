@@ -58,7 +58,7 @@ uv run pytest
 
 ```text
 langchain-interpreter/
-├── src/afm_cli/
+├── src/afm/
 │   ├── interfaces/        # Interface implementations (console, web, webhook)
 │   ├── tools/             # Tool support (MCP server)
 │   ├── resources/         # Static assets (web UI)
@@ -69,7 +69,6 @@ langchain-interpreter/
 │   ├── providers.py       # LLM provider handling
 │   └── templates.py       # Prompt templates
 ├── tests/                 # Unit and integration tests
-├── afm-samples/           # Example AFM definitions
 ├── Dockerfile             # Container build
 ├── pyproject.toml         # Python project configuration
 └── uv.lock                # Dependency lock file
