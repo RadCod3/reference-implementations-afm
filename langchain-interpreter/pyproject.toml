@@ -9,7 +9,7 @@ classifiers = [
 ]
 license = "Apache-2.0"
 requires-python = ">=3.11"
-urls = { Repository = "https://github.com/RadCod3/reference-implementations-afm" }
+urls = { Repository = "https://github.com/wso2/reference-implementations-afm" }
 dependencies = [
     "langchain>=1.2.8",
     "pyyaml>=6.0",

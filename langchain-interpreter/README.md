@@ -71,7 +71,7 @@ uv run pytest
 
 ## Project Structure
 
-```
+```text
 langchain-interpreter/
 ├── src/afm_cli/
 │   ├── interfaces/        # Interface implementations (console, web, webhook)

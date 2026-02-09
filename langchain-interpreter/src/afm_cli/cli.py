@@ -361,9 +361,9 @@ def main(
     try:
         afm = parse_afm_file(str(file))
     except AFMError as e:
-        raise click.ClickException(f"Failed to parse AFM file: {e}")
+        raise click.ClickException(f"Failed to parse AFM file: {e}") from e
     except Exception as e:
-        raise click.ClickException(f"Unexpected error parsing AFM file: {e}")
+        raise click.ClickException(f"Unexpected error parsing AFM file: {e}") from e
 
     # Extract interfaces
     consolechat, webchat, webhook = extract_interfaces(afm)

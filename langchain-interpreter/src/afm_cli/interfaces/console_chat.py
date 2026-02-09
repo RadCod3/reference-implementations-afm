@@ -161,6 +161,7 @@ class ChatApp(App):
                 except UnboundLocalError:
                     pass
                 except Exception:
+                    logger.debug("Failed to remove thinking indicator")
                     pass
 
                 await chat_log.mount(

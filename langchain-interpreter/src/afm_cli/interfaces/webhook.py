@@ -222,16 +222,10 @@ def verify_webhook_signature(
 
     # Parse signature header (format: "algorithm=signature")
     if "=" in signature_header:
-        sig_parts = signature_header.split("=", 1)
-        if len(sig_parts) == 2:
-            algo, provided_sig = sig_parts
-            # Some implementations prefix with algorithm
-            if algo.lower() in ("sha1", "sha256", "sha512"):
-                algorithm = algo.lower()
-            else:
-                provided_sig = sig_parts[1]
-        else:
-            provided_sig = signature_header
+        algo, provided_sig = signature_header.split("=", 1)
+        # Some implementations prefix with algorithm
+        if algo.lower() in ("sha1", "sha256", "sha512"):
+            algorithm = algo.lower()
     else:
         provided_sig = signature_header
 
@@ -366,9 +360,10 @@ def create_webhook_router(
             try:
                 user_prompt = evaluate_template(compiled_prompt, payload, headers)
             except TemplateEvaluationError as e:
+                logger.warning(f"Template evaluation error: {e}")
                 raise HTTPException(
                     status_code=400,
-                    detail=str(e),
+                    detail="Failed to evaluate prompt template",
                 ) from e
         else:
             # Default: stringify the payload
@@ -564,10 +559,10 @@ def resolve_secret(secret: str | None) -> str | None:
     try:
         return resolve_variables(secret)
     except VariableResolutionError as e:
-        logger.warning(f"Failed to resolve secret template '{secret}': {e}")
+        logger.warning(f"Failed to resolve secret template {e}")
         raise
     except Exception as e:
-        logger.warning(f"Unexpected error resolving secret template '{secret}': {e}")
+        logger.warning(f"Unexpected error resolving secret template {e}")
         raise
 
 

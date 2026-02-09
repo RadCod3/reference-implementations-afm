@@ -292,6 +292,13 @@ class Agent:
 
                 iterations += 1
 
+            if iterations >= max_iterations and response and response.tool_calls:
+                logger.warning(
+                    f"Max iterations ({max_iterations}) reached with "
+                    f"{len(response.tool_calls)} pending tool calls: "
+                    f"{[tc['name'] for tc in response.tool_calls]}"
+                )
+
             if response is None:
                 raise AgentError("No response from LLM")
 
@@ -396,6 +403,13 @@ class Agent:
                     )
 
                 iterations += 1
+
+            if iterations >= max_iterations and response and response.tool_calls:
+                logger.warning(
+                    f"Max iterations ({max_iterations}) reached with "
+                    f"{len(response.tool_calls)} pending tool calls: "
+                    f"{[tc['name'] for tc in response.tool_calls]}"
+                )
 
             if response is None:
                 raise AgentError("No response from LLM")
