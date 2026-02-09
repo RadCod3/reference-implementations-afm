@@ -1,8 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Webhook interface handler."""
-
 from __future__ import annotations
 
 import asyncio
@@ -18,9 +16,8 @@ from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from ..exceptions import TemplateEvaluationError, VariableResolutionError
+from ..exceptions import TemplateEvaluationError
 from ..templates import compile_template, evaluate_template
-from ..variables import resolve_variables
 from .base import InterfaceNotFoundError, get_http_path, get_webhook_interface
 
 if TYPE_CHECKING:
@@ -31,31 +28,19 @@ logger = logging.getLogger(__name__)
 
 
 class WebhookResponse(BaseModel):
-    """Response model for webhook processing."""
-
     result: Any = Field(..., description="The agent's response to the webhook")
 
 
 class ErrorResponse(BaseModel):
-    """Response model for error responses."""
-
     error: str = Field(..., description="Error message")
     detail: str | None = Field(None, description="Detailed error information")
 
 
 class HealthResponse(BaseModel):
-    """Response model for health check endpoint."""
-
     status: str = Field("ok", description="Health status")
 
 
 class WebSubSubscriber:
-    """Handles WebSub subscription lifecycle.
-
-    This class manages subscribing to a WebSub hub and handles the
-    verification callback.
-    """
-
     def __init__(
         self,
         hub: str,
@@ -65,15 +50,6 @@ class WebSubSubscriber:
         secret: str | None = None,
         lease_seconds: int = 86400,  # 24 hours default
     ) -> None:
-        """Initialize the WebSub subscriber.
-
-        Args:
-            hub: The WebSub hub URL to subscribe to.
-            topic: The topic URL to subscribe to.
-            callback: The callback URL that will receive events.
-            secret: Optional secret for HMAC signature verification.
-            lease_seconds: Subscription lease duration in seconds.
-        """
         self.hub = hub
         self.topic = topic
         self.callback = callback
@@ -84,15 +60,9 @@ class WebSubSubscriber:
 
     @property
     def is_verified(self) -> bool:
-        """Whether the subscription has been verified."""
         return self._verified
 
     async def subscribe(self) -> bool:
-        """Send subscription request to the hub.
-
-        Returns:
-            True if subscription request was accepted, False otherwise.
-        """
         try:
             async with httpx.AsyncClient() as client:
                 data = {
@@ -131,11 +101,6 @@ class WebSubSubscriber:
             return False
 
     async def unsubscribe(self) -> bool:
-        """Send unsubscription request to the hub.
-
-        Returns:
-            True if unsubscription request was accepted, False otherwise.
-        """
         try:
             async with httpx.AsyncClient() as client:
                 data = {
@@ -171,17 +136,6 @@ class WebSubSubscriber:
         challenge: str,
         lease_seconds: int | None = None,
     ) -> str | None:
-        """Verify a WebSub verification request.
-
-        Args:
-            mode: The hub.mode parameter (subscribe or unsubscribe).
-            topic: The hub.topic parameter.
-            challenge: The hub.challenge parameter to echo back.
-            lease_seconds: Optional lease duration from hub.
-
-        Returns:
-            The challenge string to echo back if valid, None otherwise.
-        """
         if topic != self.topic:
             logger.warning(f"Topic mismatch: expected {self.topic}, got {topic}")
             return None
@@ -206,17 +160,6 @@ def verify_webhook_signature(
     *,
     algorithm: str = "sha256",
 ) -> bool:
-    """Verify the HMAC signature of a webhook payload.
-
-    Args:
-        body: The raw request body bytes.
-        signature_header: The signature header value (e.g., "sha256=abc123...").
-        secret: The shared secret for HMAC verification.
-        algorithm: The hash algorithm (default: sha256).
-
-    Returns:
-        True if signature is valid, False otherwise.
-    """
     if not signature_header:
         return False
 
@@ -254,21 +197,6 @@ def create_webhook_router(
     *,
     verify_signatures: bool = True,
 ) -> APIRouter:
-    """Create an APIRouter with webhook endpoints.
-
-    This function creates a router that can be mounted on any FastAPI app.
-    It's used internally by create_webhook_app() and can be used directly
-    for composing unified apps with multiple interfaces.
-
-    Args:
-        agent: The AFM agent to expose.
-        interface: The webhook interface configuration.
-        path: The path for the webhook endpoint. Defaults to "/webhook".
-        verify_signatures: Whether to verify HMAC signatures. Defaults to True.
-
-    Returns:
-        An APIRouter with the webhook endpoints.
-    """
     router = APIRouter()
 
     # Compile the prompt template if provided
@@ -282,7 +210,7 @@ def create_webhook_router(
 
     # Get subscription configuration
     subscription = interface.subscription
-    secret = resolve_secret(subscription.secret)
+    secret = subscription.secret
 
     # WebSub verification endpoint
     @router.get(path)
@@ -293,7 +221,6 @@ def create_webhook_router(
         hub_challenge: str = Query(..., alias="hub.challenge"),
         hub_lease_seconds: int | None = Query(None, alias="hub.lease_seconds"),
     ) -> PlainTextResponse:
-        """WebSub subscription verification endpoint."""
         # Check for subscriber in app state (for topic verification)
         websub_subscriber = getattr(request.app.state, "websub_subscriber", None)
 
@@ -329,7 +256,6 @@ def create_webhook_router(
         },
     )
     async def receive_webhook(request: Request) -> JSONResponse:
-        """Receive and process webhook events."""
         # Get raw body for signature verification
         body = await request.body()
 
@@ -409,44 +335,6 @@ def create_webhook_app(
     host: str | None = None,
     port: int | None = None,
 ) -> FastAPI:
-    """Create a FastAPI application for webhook handling.
-
-    This function creates a FastAPI app that exposes the agent as a webhook
-    endpoint. The app includes:
-
-    - POST {path} - Webhook event receiver (default: /webhook)
-    - GET {path} - WebSub verification endpoint
-    - GET /health - Health check
-
-    Features:
-    - Template evaluation for constructing prompts from payloads
-    - HMAC signature verification (optional)
-    - WebSub auto-subscription on startup (optional)
-
-    Args:
-        agent: The AFM agent to expose.
-        verify_signatures: Whether to verify HMAC signatures. Defaults to True.
-        auto_subscribe: Whether to auto-subscribe to WebSub hub. Defaults to True.
-        path: Optional custom path for the webhook endpoint.
-              If not provided, uses the path from the interface configuration
-              or defaults to "/webhook".
-        host: Optional host to use for WebSub callback URL construction.
-              Used when subscription.callback is not configured.
-        port: Optional port to use for WebSub callback URL construction.
-              Used when subscription.callback is not configured.
-
-    Returns:
-        A FastAPI application instance.
-
-    Example:
-        >>> from afm_cli import parse_afm_file, Agent
-        >>> from afm_cli.interfaces import create_webhook_app
-        >>> import uvicorn
-        >>> afm = parse_afm_file("webhook_agent.afm.md")
-        >>> agent = Agent(afm)
-        >>> app = create_webhook_app(agent)
-        >>> uvicorn.run(app, host="0.0.0.0", port=8000)
-    """
     # Get interface configuration
     try:
         interface = get_webhook_interface(agent.afm)
@@ -459,7 +347,7 @@ def create_webhook_app(
 
     # Get subscription configuration for WebSub
     subscription = interface.subscription
-    secret = resolve_secret(subscription.secret)
+    secret = subscription.secret
 
     # Set up WebSub subscriber if configured
     websub_subscriber: WebSubSubscriber | None = None
@@ -527,18 +415,10 @@ def create_webhook_app(
     app.state.secret = secret
     app.state.verify_signatures = verify_signatures
 
-    # ==========================================================================
-    # Health Endpoint
-    # ==========================================================================
-
     @app.get("/health", response_model=HealthResponse)
     async def health_check() -> HealthResponse:
         """Health check endpoint."""
         return HealthResponse(status="ok")
-
-    # ==========================================================================
-    # Include Webhook Router
-    # ==========================================================================
 
     webhook_router = create_webhook_router(
         agent, interface, webhook_path, verify_signatures=verify_signatures
@@ -553,13 +433,6 @@ async def subscribe_with_retry(
     max_retries: int = 3,
     retry_delay: float = 5.0,
 ) -> None:
-    """Subscribe to WebSub hub with retry logic.
-
-    Args:
-        subscriber: The WebSub subscriber instance.
-        max_retries: Maximum number of retry attempts.
-        retry_delay: Delay between retries in seconds.
-    """
     for attempt in range(max_retries):
         try:
             success = await subscriber.subscribe()
@@ -580,61 +453,3 @@ def log_task_exception(task: asyncio.Task) -> None:
             "Background subscription task failed with unexpected error",
             exc_info=task.exception(),
         )
-
-
-def resolve_secret(secret: str | None) -> str | None:
-    if not secret:
-        return None
-
-    try:
-        return resolve_variables(secret)
-    except VariableResolutionError as e:
-        logger.warning(f"Failed to resolve secret template {e}")
-        raise
-    except Exception as e:
-        logger.warning(f"Unexpected error resolving secret template {e}")
-        raise
-
-
-def run_webhook_server(
-    agent: Agent,
-    *,
-    host: str = "0.0.0.0",
-    port: int = 8000,
-    verify_signatures: bool = True,
-    auto_subscribe: bool = True,
-    path: str | None = None,
-    log_level: str = "info",
-) -> None:
-    """Run a webhook server for the agent.
-
-    This is a convenience function that creates the FastAPI app and runs
-    it with uvicorn.
-
-    Args:
-        agent: The AFM agent to expose.
-        host: The host to bind to. Defaults to "0.0.0.0".
-        port: The port to listen on. Defaults to 8000.
-        verify_signatures: Whether to verify HMAC signatures.
-        auto_subscribe: Whether to auto-subscribe to WebSub hub.
-        path: Optional custom path for the webhook endpoint.
-        log_level: Uvicorn log level. Defaults to "info".
-
-    Example:
-        >>> from afm_cli import parse_afm_file, Agent
-        >>> from afm_cli.interfaces import run_webhook_server
-        >>> afm = parse_afm_file("webhook_agent.afm.md")
-        >>> agent = Agent(afm)
-        >>> run_webhook_server(agent, port=8080)
-    """
-    import uvicorn
-
-    app = create_webhook_app(
-        agent,
-        verify_signatures=verify_signatures,
-        auto_subscribe=auto_subscribe,
-        path=path,
-        host=host,
-        port=port,
-    )
-    uvicorn.run(app, host=host, port=port, log_level=log_level)

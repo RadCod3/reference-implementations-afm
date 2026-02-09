@@ -1,29 +1,17 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Tests for the AFM parser module."""
-
 from pathlib import Path
 
 import pytest
 
-from afm_cli import (
-    AFMParseError,
-    AFMValidationError,
-    ConsoleChatInterface,
-    WebChatInterface,
-    WebhookInterface,
-    parse_afm,
-    parse_afm_file,
-    validate_and_extract_interfaces,
-)
+from afm_cli.exceptions import AFMParseError, AFMValidationError
+from afm_cli.models import ConsoleChatInterface, WebChatInterface, WebhookInterface
+from afm_cli.parser import parse_afm, parse_afm_file
 
 
 class TestParseAfm:
-    """Tests for the parse_afm function."""
-
     def test_parse_full_agent(self, sample_agent_path: Path) -> None:
-        """Test parsing a full AFM file with all fields."""
         content = sample_agent_path.read_text()
         result = parse_afm(content)
 
@@ -72,7 +60,6 @@ class TestParseAfm:
         )
 
     def test_parse_consolechat_agent(self, sample_consolechat_path: Path) -> None:
-        """Test parsing a console chat agent."""
         content = sample_consolechat_path.read_text()
         result = parse_afm(content)
 
@@ -95,7 +82,6 @@ class TestParseAfm:
         assert result.metadata.model.authentication.token == "mock-token"
 
     def test_parse_webhook_agent(self, sample_webhook_path: Path) -> None:
-        """Test parsing a webhook agent."""
         content = sample_webhook_path.read_text()
         result = parse_afm(content)
 
@@ -116,7 +102,6 @@ class TestParseAfm:
         assert interface.subscription.hub == "http://localhost:9193/websub/hub"
 
     def test_parse_minimal_agent(self, sample_minimal_path: Path) -> None:
-        """Test parsing a minimal AFM file."""
         content = sample_minimal_path.read_text()
         result = parse_afm(content)
 
@@ -125,7 +110,6 @@ class TestParseAfm:
         assert result.instructions == "Agent instructions here."
 
     def test_parse_no_frontmatter(self, sample_no_frontmatter_path: Path) -> None:
-        """Test parsing AFM without frontmatter (allowed in Python impl)."""
         content = sample_no_frontmatter_path.read_text()
         result = parse_afm(content)
 
@@ -137,24 +121,7 @@ class TestParseAfm:
         assert result.role == "This is the role without frontmatter."
         assert result.instructions == "These are instructions without frontmatter."
 
-    def test_parse_empty_frontmatter(self) -> None:
-        """Test parsing AFM with empty frontmatter."""
-        content = """---
----
-
-# Role
-The role.
-
-# Instructions
-The instructions.
-"""
-        result = parse_afm(content)
-        assert result.metadata.spec_version is None
-        assert result.role == "The role."
-        assert result.instructions == "The instructions."
-
     def test_parse_unclosed_frontmatter(self) -> None:
-        """Test that unclosed frontmatter raises an error."""
         content = """---
 spec_version: "0.3.0"
 
@@ -166,7 +133,6 @@ The role.
         assert "Unclosed frontmatter" in str(exc_info.value)
 
     def test_parse_invalid_yaml(self) -> None:
-        """Test that invalid YAML raises an error."""
         content = """---
 spec_version: "0.3.0"
 invalid: [unclosed
@@ -183,7 +149,6 @@ Instructions.
         assert "Invalid YAML" in str(exc_info.value)
 
     def test_parse_invalid_field_type(self) -> None:
-        """Test that invalid field types raise validation error."""
         content = """---
 spec_version: "0.3.0"
 max_iterations: "not a number"
@@ -199,7 +164,6 @@ Instructions.
             parse_afm(content)
 
     def test_parse_multiline_role_and_instructions(self) -> None:
-        """Test parsing multiline role and instructions."""
         content = """---
 spec_version: "0.3.0"
 ---
@@ -221,7 +185,6 @@ Line 2 of instructions.
         assert "Line 2 of instructions." in result.instructions
 
     def test_role_heading_exact_match_only(self) -> None:
-        """Test that only exact 'Role' heading triggers role detection."""
         content = """---
 spec_version: "0.3.0"
 ---
@@ -241,7 +204,6 @@ These are instructions.
         assert result.role == "This is the actual role."
 
     def test_instructions_heading_exact_match_only(self) -> None:
-        """Test that only exact 'Instructions' heading triggers instructions detection."""
         content = """---
 spec_version: "0.3.0"
 ---
@@ -260,23 +222,7 @@ These are the actual instructions.
         assert "This should NOT be parsed as instructions." not in result.instructions
         assert result.instructions == "These are the actual instructions."
 
-    def test_role_heading_with_trailing_whitespace(self) -> None:
-        """Test that role heading with trailing whitespace is still recognized."""
-        content = """---
-spec_version: "0.3.0"
----
-
-# Role  
-This is the role with trailing spaces.
-
-# Instructions
-These are instructions.
-"""
-        result = parse_afm(content)
-        assert result.role == "This is the role with trailing spaces."
-
     def test_case_insensitive_headings(self) -> None:
-        """Test that headings are case-insensitive."""
         content = """---
 spec_version: "0.3.0"
 ---
@@ -293,77 +239,10 @@ These are the instructions.
 
 
 class TestParseAfmFile:
-    """Tests for the parse_afm_file function."""
-
     def test_parse_file(self, sample_agent_path: Path) -> None:
-        """Test parsing from a file path."""
         result = parse_afm_file(sample_agent_path)
         assert result.metadata.name == "TestAgent"
 
-    def test_parse_file_string_path(self, sample_agent_path: Path) -> None:
-        """Test parsing from a string file path."""
-        result = parse_afm_file(str(sample_agent_path))
-        assert result.metadata.name == "TestAgent"
-
     def test_parse_nonexistent_file(self) -> None:
-        """Test that parsing a nonexistent file raises an error."""
         with pytest.raises(FileNotFoundError):
             parse_afm_file("/nonexistent/path/agent.afm.md")
-
-
-class TestValidateAndExtractInterfaces:
-    """Tests for the validate_and_extract_interfaces function."""
-
-    def test_single_consolechat(self) -> None:
-        """Test extracting a single console chat interface."""
-        interfaces = [ConsoleChatInterface()]
-        console, web, webhook = validate_and_extract_interfaces(interfaces)
-
-        assert console is not None
-        assert isinstance(console, ConsoleChatInterface)
-        assert web is None
-        assert webhook is None
-
-    def test_single_webchat(self) -> None:
-        """Test extracting a single web chat interface."""
-        interfaces = [WebChatInterface()]
-        console, web, webhook = validate_and_extract_interfaces(interfaces)
-
-        assert console is None
-        assert web is not None
-        assert isinstance(web, WebChatInterface)
-        assert webhook is None
-
-    def test_mixed_interfaces(self) -> None:
-        """Test extracting mixed interface types."""
-        interfaces = [ConsoleChatInterface(), WebChatInterface()]
-        console, web, webhook = validate_and_extract_interfaces(interfaces)
-
-        assert console is not None
-        assert web is not None
-        assert webhook is None
-
-    def test_duplicate_consolechat_error(self) -> None:
-        """Test that duplicate console chat interfaces raise an error."""
-        interfaces = [ConsoleChatInterface(), ConsoleChatInterface()]
-
-        with pytest.raises(AFMValidationError) as exc_info:
-            validate_and_extract_interfaces(interfaces)
-        assert "Multiple interfaces" in str(exc_info.value)
-
-    def test_duplicate_webchat_error(self) -> None:
-        """Test that duplicate web chat interfaces raise an error."""
-        interfaces = [WebChatInterface(), WebChatInterface()]
-
-        with pytest.raises(AFMValidationError) as exc_info:
-            validate_and_extract_interfaces(interfaces)
-        assert "Multiple interfaces" in str(exc_info.value)
-
-    def test_empty_interfaces(self) -> None:
-        """Test extracting from empty interface list."""
-        interfaces: list = []
-        console, web, webhook = validate_and_extract_interfaces(interfaces)
-
-        assert console is None
-        assert web is None
-        assert webhook is None

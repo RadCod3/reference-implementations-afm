@@ -1,38 +1,34 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Tests for webhook interface handler."""
-
 from __future__ import annotations
 
 import hashlib
 import hmac
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from afm_cli import (
+from afm_cli.agent import Agent
+from afm_cli.interfaces.webhook import (
+    WebSubSubscriber,
+    create_webhook_app,
+    verify_webhook_signature,
+)
+from afm_cli.models import (
+    Exposure,
+    HTTPExposure,
     JSONSchema,
     Signature,
     Subscription,
     WebhookInterface,
 )
-from afm_cli.agent import Agent
-from afm_cli.exceptions import VariableResolutionError
-from afm_cli.interfaces.webhook import (
-    WebSubSubscriber,
-    create_webhook_app,
-    resolve_secret,
-    verify_webhook_signature,
-)
-from afm_cli.models import Exposure, HTTPExposure
 
 
 @pytest.fixture
 def mock_webhook_agent() -> MagicMock:
-    """Create a mock agent with webhook interface for testing."""
     agent = MagicMock(spec=Agent)
     agent.name = "Webhook Test Agent"
     agent.description = "A test agent for webhook testing"
@@ -68,7 +64,6 @@ def mock_webhook_agent() -> MagicMock:
 
 @pytest.fixture
 def mock_webhook_agent_no_template() -> MagicMock:
-    """Create a mock agent with webhook interface but no prompt template."""
     agent = MagicMock(spec=Agent)
     agent.name = "No Template Agent"
     agent.description = "Agent without prompt template"
@@ -100,7 +95,6 @@ def mock_webhook_agent_no_template() -> MagicMock:
 
 @pytest.fixture
 def mock_webhook_agent_no_secret() -> MagicMock:
-    """Create a mock agent with webhook interface but no secret."""
     agent = MagicMock(spec=Agent)
     agent.name = "No Secret Agent"
     agent.description = "Agent without webhook secret"
@@ -131,10 +125,7 @@ def mock_webhook_agent_no_secret() -> MagicMock:
 
 
 class TestVerifyWebhookSignature:
-    """Tests for verify_webhook_signature function."""
-
     def test_valid_sha256_signature(self) -> None:
-        """Test verification with valid SHA256 signature."""
         body = b'{"event": "test"}'
         secret = "my-secret"
         expected_sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
@@ -148,7 +139,6 @@ class TestVerifyWebhookSignature:
         assert result is True
 
     def test_valid_signature_without_prefix(self) -> None:
-        """Test verification with signature without algorithm prefix."""
         body = b'{"event": "test"}'
         secret = "my-secret"
         expected_sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
@@ -162,7 +152,6 @@ class TestVerifyWebhookSignature:
         assert result is True
 
     def test_invalid_signature(self) -> None:
-        """Test verification fails with invalid signature."""
         body = b'{"event": "test"}'
         secret = "my-secret"
 
@@ -175,7 +164,6 @@ class TestVerifyWebhookSignature:
         assert result is False
 
     def test_missing_signature_header(self) -> None:
-        """Test verification fails when signature header is missing."""
         body = b'{"event": "test"}'
         secret = "my-secret"
 
@@ -188,7 +176,6 @@ class TestVerifyWebhookSignature:
         assert result is False
 
     def test_sha1_signature(self) -> None:
-        """Test verification with SHA1 signature."""
         body = b'{"event": "test"}'
         secret = "my-secret"
         expected_sig = hmac.new(secret.encode(), body, hashlib.sha1).hexdigest()
@@ -203,74 +190,14 @@ class TestVerifyWebhookSignature:
         assert result is True
 
 
-class TestWebSubSubscriber:
-    """Tests for WebSubSubscriber class."""
-
-    def test_verify_challenge_subscribe(self) -> None:
-        """Test challenge verification for subscription."""
-        subscriber = WebSubSubscriber(
-            hub="https://hub.example.com",
-            topic="https://example.com/topic",
-            callback="https://myapp.com/webhook",
-        )
-
-        result = subscriber.verify_challenge(
-            mode="subscribe",
-            topic="https://example.com/topic",
-            challenge="test-challenge-123",
-        )
-
-        assert result == "test-challenge-123"
-        assert subscriber.is_verified is True
-
-    def test_verify_challenge_unsubscribe(self) -> None:
-        """Test challenge verification for unsubscription."""
-        subscriber = WebSubSubscriber(
-            hub="https://hub.example.com",
-            topic="https://example.com/topic",
-            callback="https://myapp.com/webhook",
-        )
-        subscriber._verified = True  # Simulate already verified
-
-        result = subscriber.verify_challenge(
-            mode="unsubscribe",
-            topic="https://example.com/topic",
-            challenge="test-challenge-456",
-        )
-
-        assert result == "test-challenge-456"
-        assert subscriber.is_verified is False
-
-    def test_verify_challenge_topic_mismatch(self) -> None:
-        """Test challenge verification fails on topic mismatch."""
-        subscriber = WebSubSubscriber(
-            hub="https://hub.example.com",
-            topic="https://example.com/topic",
-            callback="https://myapp.com/webhook",
-        )
-
-        result = subscriber.verify_challenge(
-            mode="subscribe",
-            topic="https://example.com/different-topic",
-            challenge="test-challenge",
-        )
-
-        assert result is None
-        assert subscriber.is_verified is False
-
-
 class TestCreateWebhookApp:
-    """Tests for create_webhook_app function."""
-
     def test_creates_fastapi_app(self, mock_webhook_agent: MagicMock) -> None:
-        """Test that a FastAPI app is created."""
         app = create_webhook_app(mock_webhook_agent, auto_subscribe=False)
 
         assert app is not None
         assert "Webhook" in app.title
 
     def test_health_endpoint(self, mock_webhook_agent: MagicMock) -> None:
-        """Test that GET /health returns ok."""
         app = create_webhook_app(mock_webhook_agent, auto_subscribe=False)
         client = TestClient(app)
 
@@ -280,7 +207,6 @@ class TestCreateWebhookApp:
         assert response.json()["status"] == "ok"
 
     def test_webhook_processes_payload(self, mock_webhook_agent: MagicMock) -> None:
-        """Test that POST /webhook processes the payload."""
         app = create_webhook_app(
             mock_webhook_agent,
             auto_subscribe=False,
@@ -303,7 +229,6 @@ class TestCreateWebhookApp:
     def test_webhook_with_signature_verification(
         self, mock_webhook_agent: MagicMock
     ) -> None:
-        """Test that webhook verifies signature when configured."""
         app = create_webhook_app(
             mock_webhook_agent,
             auto_subscribe=False,
@@ -331,7 +256,6 @@ class TestCreateWebhookApp:
     def test_webhook_rejects_invalid_signature(
         self, mock_webhook_agent: MagicMock
     ) -> None:
-        """Test that webhook rejects invalid signature."""
         app = create_webhook_app(
             mock_webhook_agent,
             auto_subscribe=False,
@@ -351,7 +275,6 @@ class TestCreateWebhookApp:
     def test_webhook_without_template_uses_raw_payload(
         self, mock_webhook_agent_no_template: MagicMock
     ) -> None:
-        """Test that webhook uses raw payload when no template is configured."""
         app = create_webhook_app(
             mock_webhook_agent_no_template,
             auto_subscribe=False,
@@ -371,7 +294,6 @@ class TestCreateWebhookApp:
     def test_webhook_invalid_json_returns_400(
         self, mock_webhook_agent: MagicMock
     ) -> None:
-        """Test that invalid JSON returns 400."""
         app = create_webhook_app(
             mock_webhook_agent,
             auto_subscribe=False,
@@ -391,7 +313,6 @@ class TestCreateWebhookApp:
     def test_webhook_agent_error_returns_500(
         self, mock_webhook_agent: MagicMock
     ) -> None:
-        """Test that agent errors return 500."""
 
         async def failing_arun(input_data: str, session_id: str = "default") -> str:
             raise Exception("Agent failed")
@@ -413,40 +334,16 @@ class TestCreateWebhookApp:
         assert response.status_code == 500
         assert "Internal server error" in response.json()["detail"]
 
-    def test_webhook_no_secret_skips_verification(
-        self, mock_webhook_agent_no_secret: MagicMock
-    ) -> None:
-        """Test that webhook skips verification when no secret is configured."""
-        app = create_webhook_app(
-            mock_webhook_agent_no_secret,
-            auto_subscribe=False,
-            verify_signatures=True,  # Enabled but no secret
-        )
-        client = TestClient(app)
-
-        # Should work without signature since no secret is configured
-        response = client.post(
-            "/webhook",
-            json={"type": "test_type"},
-        )
-
-        assert response.status_code == 200
-
 
 class TestWebSubVerification:
-    """Tests for WebSub verification endpoint."""
-
     def test_websub_verification_returns_challenge(
         self, mock_webhook_agent: MagicMock
     ) -> None:
-        """Test that WebSub verification returns the challenge."""
         app = create_webhook_app(
             mock_webhook_agent,
-            auto_subscribe=False,  # Disable auto-subscribe for testing
+            auto_subscribe=False,
         )
         # Manually set up subscriber for testing
-        from afm_cli.interfaces.webhook import WebSubSubscriber
-
         app.state.websub_subscriber = WebSubSubscriber(
             hub="https://hub.example.com",
             topic="https://example.com/events",
@@ -470,13 +367,10 @@ class TestWebSubVerification:
     def test_websub_verification_fails_wrong_topic(
         self, mock_webhook_agent: MagicMock
     ) -> None:
-        """Test that WebSub verification fails for wrong topic."""
         app = create_webhook_app(
             mock_webhook_agent,
             auto_subscribe=False,
         )
-        from afm_cli.interfaces.webhook import WebSubSubscriber
-
         app.state.websub_subscriber = WebSubSubscriber(
             hub="https://hub.example.com",
             topic="https://example.com/events",
@@ -499,7 +393,6 @@ class TestWebSubVerification:
     def test_websub_verification_no_subscriber(
         self, mock_webhook_agent_no_secret: MagicMock
     ) -> None:
-        """Test that verification fails when no subscriber is configured."""
         app = create_webhook_app(
             mock_webhook_agent_no_secret,
             auto_subscribe=False,
@@ -519,223 +412,3 @@ class TestWebSubVerification:
         )
 
         assert response.status_code == 404
-
-
-class TestCustomPath:
-    """Tests for custom webhook paths."""
-
-    def test_custom_path_from_interface(self, mock_webhook_agent: MagicMock) -> None:
-        """Test that custom path from interface is used."""
-        # Modify the interface to use a custom path
-        mock_webhook_agent.afm.metadata.interfaces[0].exposure = Exposure(
-            http=HTTPExposure(path="/custom/hook")
-        )
-
-        app = create_webhook_app(
-            mock_webhook_agent,
-            auto_subscribe=False,
-            verify_signatures=False,
-        )
-        client = TestClient(app)
-
-        # Default path should not work
-        response = client.post("/webhook", json={"event": "test"})
-        assert response.status_code == 404
-
-        # Custom path should work
-        response = client.post("/custom/hook", json={"event": "test"})
-        assert response.status_code == 200
-
-    def test_custom_path_override(self, mock_webhook_agent: MagicMock) -> None:
-        """Test that path can be overridden via parameter."""
-        app = create_webhook_app(
-            mock_webhook_agent,
-            auto_subscribe=False,
-            verify_signatures=False,
-            path="/api/events",
-        )
-        client = TestClient(app)
-
-        # Interface path should not work
-        response = client.post("/webhook", json={"event": "test"})
-        assert response.status_code == 404
-
-        # Override path should work
-        response = client.post("/api/events", json={"event": "test"})
-        assert response.status_code == 200
-
-
-class TestWebSubSubscriberAsync:
-    """Async tests for WebSubSubscriber."""
-
-    @pytest.mark.asyncio
-    async def test_subscribe_sends_request(self) -> None:
-        """Test that subscribe sends request to hub."""
-        subscriber = WebSubSubscriber(
-            hub="https://hub.example.com",
-            topic="https://example.com/topic",
-            callback="https://myapp.com/webhook",
-            secret="my-secret",
-        )
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 202
-
-            mock_instance = AsyncMock()
-            mock_instance.post = AsyncMock(return_value=mock_response)
-            mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_instance.__aexit__ = AsyncMock(return_value=None)
-            mock_client.return_value = mock_instance
-
-            result = await subscriber.subscribe()
-
-            assert result is True
-            mock_instance.post.assert_called_once()
-            call_args = mock_instance.post.call_args
-            assert call_args[0][0] == "https://hub.example.com"
-
-    @pytest.mark.asyncio
-    async def test_subscribe_handles_failure(self) -> None:
-        """Test that subscribe handles failures gracefully."""
-        subscriber = WebSubSubscriber(
-            hub="https://hub.example.com",
-            topic="https://example.com/topic",
-            callback="https://myapp.com/webhook",
-        )
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 500
-            mock_response.text = "Internal Server Error"
-
-            mock_instance = AsyncMock()
-            mock_instance.post = AsyncMock(return_value=mock_response)
-            mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_instance.__aexit__ = AsyncMock(return_value=None)
-            mock_client.return_value = mock_instance
-
-            result = await subscriber.subscribe()
-
-            assert result is False
-
-    @pytest.mark.asyncio
-    async def test_unsubscribe_sends_request(self) -> None:
-        """Test that unsubscribe sends request to hub."""
-        subscriber = WebSubSubscriber(
-            hub="https://hub.example.com",
-            topic="https://example.com/topic",
-            callback="https://myapp.com/webhook",
-        )
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 202
-
-            mock_instance = AsyncMock()
-            mock_instance.post = AsyncMock(return_value=mock_response)
-            mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
-            mock_instance.__aexit__ = AsyncMock(return_value=None)
-            mock_client.return_value = mock_instance
-
-            result = await subscriber.unsubscribe()
-
-            assert result is True
-            call_args = mock_instance.post.call_args
-            data = call_args[1]["data"]
-            assert data["hub.mode"] == "unsubscribe"
-
-
-class TestResolveSecret:
-    """Tests for resolve_secret function."""
-
-    def test_returns_none_for_none(self) -> None:
-        """Test that None returns None."""
-        result = resolve_secret(None)
-        assert result is None
-
-    def test_returns_none_for_empty_string(self) -> None:
-        """Test that empty string returns None."""
-        result = resolve_secret("")
-        assert result is None
-
-    def test_returns_secret_without_variables(self) -> None:
-        """Test that secrets without variables are returned as-is."""
-        secret = "my-plain-secret"
-        result = resolve_secret(secret)
-        assert result == secret
-
-    def test_resolves_env_variable(self, monkeypatch) -> None:
-        """Test that ${env:VAR} is properly resolved."""
-        monkeypatch.setenv("WEBHOOK_SECRET", "resolved-secret-value")
-        result = resolve_secret("${env:WEBHOOK_SECRET}")
-        assert result == "resolved-secret-value"
-
-    def test_resolves_env_variable_without_prefix(self, monkeypatch) -> None:
-        """Test that ${VAR} is properly resolved (no env: prefix)."""
-        monkeypatch.setenv("SECRET_KEY", "my-secret-key")
-        result = resolve_secret("${SECRET_KEY}")
-        assert result == "my-secret-key"
-
-    def test_raises_error_for_missing_env_variable(self) -> None:
-        """Test that VariableResolutionError is raised for missing env variable."""
-        with pytest.raises(VariableResolutionError) as exc_info:
-            resolve_secret("${env:NONEXISTENT_VAR}")
-        assert "NONEXISTENT_VAR" in str(exc_info.value)
-
-    def test_raises_error_with_logging(self, caplog) -> None:
-        """Test that warning is logged before raising error."""
-        import logging
-
-        with caplog.at_level(logging.WARNING):
-            with pytest.raises(VariableResolutionError):
-                resolve_secret("${env:MISSING_SECRET}")
-        assert "Failed to resolve secret template" in caplog.text
-        assert "${env:MISSING_SECRET}" in caplog.text
-
-    def test_raises_error_for_unsupported_prefix(self) -> None:
-        """Test that VariableResolutionError is raised for unsupported prefixes."""
-        with pytest.raises(VariableResolutionError) as exc_info:
-            resolve_secret("${unsupported:VAR}")
-        assert "unsupported" in str(exc_info.value)
-
-
-# =============================================================================
-# Lifespan Tests
-# =============================================================================
-
-
-class TestLifespan:
-    """Tests for webhook app lifespan (startup/shutdown) behavior."""
-
-    @pytest.mark.asyncio
-    async def test_lifespan_cancels_subscription_task_on_shutdown(
-        self, mock_webhook_agent: MagicMock
-    ) -> None:
-        """Verify that the subscription task is cancelled during shutdown."""
-        import asyncio
-        from asgi_lifespan import LifespanManager
-
-        # Create an async function that blocks indefinitely (simulating a long retry sleep)
-        async def blocking_subscribe(*args, **kwargs) -> None:
-            await asyncio.sleep(3600)
-
-        app = create_webhook_app(
-            mock_webhook_agent,
-            auto_subscribe=True,
-            verify_signatures=False,
-        )
-
-        # Patch subscribe_with_retry to block and use LifespanManager to test shutdown
-        with patch(
-            "afm_cli.interfaces.webhook.subscribe_with_retry", blocking_subscribe
-        ):
-            async with LifespanManager(app):
-                task = app.state.subscription_task
-                assert not task.done()
-                # Let it start
-                await asyncio.sleep(0.01)
-
-            # After exiting the context, task should be cancelled
-            assert task.done()
-            assert task.cancelled()

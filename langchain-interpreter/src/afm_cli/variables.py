@@ -1,14 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Variable substitution for AFM files.
-
-Supports the following variable prefixes:
-- env: - Environment variables (resolved at load time)
-- http: - HTTP context variables (preserved for runtime resolution)
-- No prefix - Treated as environment variables
-"""
-
 from __future__ import annotations
 
 import os
@@ -38,32 +30,10 @@ VARIABLE_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
 
 def resolve_variables(content: str) -> str:
-    """Resolve static variables in AFM content.
-
-    Resolves:
-    - ${env:VAR_NAME} - Environment variables
-    - ${VAR_NAME} - Environment variables (no prefix)
-
-    Preserves:
-    - ${http:...} - Runtime variables for webhook templates
-
-    Skips variables in YAML comments (lines starting with #).
-
-    Args:
-        content: The raw AFM content string.
-
-    Returns:
-        Content with static variables resolved.
-
-    Raises:
-        VariableResolutionError: If an environment variable is not found
-            or an unsupported prefix is used.
-    """
     result = content
     start_pos = 0
 
     while True:
-        # Find next variable
         match = VARIABLE_PATTERN.search(result, start_pos)
         if match is None:
             break
@@ -72,28 +42,23 @@ def resolve_variables(content: str) -> str:
         close_brace_pos = match.end()
         var_expr = match.group(1)
 
-        # Check if this variable is in a commented line
         line_start = result.rfind("\n", 0, dollar_pos) + 1
         line_prefix = result[line_start:dollar_pos].strip()
 
         if line_prefix.startswith("#"):
-            # Skip variables in commented lines
             start_pos = close_brace_pos
             continue
 
-        # Parse prefix and variable name
         if ":" in var_expr:
             prefix, var_name = var_expr.split(":", 1)
         else:
             prefix = ""
             var_name = var_expr
 
-        # Skip http: variables - they're handled at runtime
         if prefix == "http":
             start_pos = close_brace_pos
             continue
 
-        # Resolve the variable
         if prefix in ("", "env"):
             env_value = os.environ.get(var_name)
             if env_value is None or env_value == "":
@@ -118,23 +83,10 @@ def resolve_variables(content: str) -> str:
 
 
 def contains_http_variable(content: str) -> bool:
-    """Check if content contains any http: variable references."""
     return "${http:" in content
 
 
 def validate_http_variables(afm_record: AFMRecord) -> None:
-    """Validate that http: variables only appear in webhook prompts.
-
-    http: variables are only valid in the 'prompt' field of webhook interfaces.
-    This function checks all other fields and raises an error if http: variables
-    are found in invalid locations.
-
-    Args:
-        afm_record: The parsed AFM record to validate.
-
-    Raises:
-        AFMValidationError: If http: variables are found in invalid locations.
-    """
     errored_fields: list[str] = []
 
     # Check role and instructions
@@ -231,7 +183,6 @@ def validate_http_variables(afm_record: AFMRecord) -> None:
 def _authentication_contains_http_variable(
     auth: ClientAuthentication | None,
 ) -> bool:
-    """Check if authentication config contains http: variables."""
     if auth is None:
         return False
 
@@ -243,14 +194,12 @@ def _authentication_contains_http_variable(
 
 
 def _signature_contains_http_variable(signature: Signature) -> bool:
-    """Check if signature contains http: variables."""
     return _json_schema_contains_http_variable(
         signature.input
     ) or _json_schema_contains_http_variable(signature.output)
 
 
 def _json_schema_contains_http_variable(schema: JSONSchema) -> bool:
-    """Check if JSON schema contains http: variables."""
     # Dump all fields and recursively check them
     schema_dict = schema.model_dump()
 
@@ -272,14 +221,12 @@ def _json_schema_contains_http_variable(schema: JSONSchema) -> bool:
 
 
 def _exposure_contains_http_variable(exposure: Exposure) -> bool:
-    """Check if exposure config contains http: variables."""
     if exposure.http and contains_http_variable(exposure.http.path):
         return True
     return False
 
 
 def _subscription_contains_http_variable(subscription: Subscription) -> bool:
-    """Check if subscription config contains http: variables."""
     if contains_http_variable(subscription.protocol):
         return True
     if subscription.hub and contains_http_variable(subscription.hub):
@@ -296,7 +243,6 @@ def _subscription_contains_http_variable(subscription: Subscription) -> bool:
 
 
 def _tool_filter_contains_http_variable(tool_filter: ToolFilter | None) -> bool:
-    """Check if tool filter contains http: variables."""
     if tool_filter is None:
         return False
 

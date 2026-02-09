@@ -1,12 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""AFM Agent runtime using LangChain.
-
-This module provides the Agent class that wraps a parsed AFM record
-and executes it using LangChain's chat models.
-"""
-
 from __future__ import annotations
 
 import json
@@ -36,8 +30,6 @@ logger = logging.getLogger(__name__)
 
 
 class Agent:
-    """AFM Agent runtime using LangChain."""
-
     def __init__(
         self,
         afm: AFMRecord,
@@ -73,7 +65,6 @@ class Agent:
         await self.disconnect()
 
     async def connect(self) -> None:
-        """Connect to MCP servers and load tools."""
         if self._connected:
             return
 
@@ -91,7 +82,6 @@ class Agent:
         self._connected = True
 
     async def disconnect(self) -> None:
-        """Disconnect from MCP servers and clear tools."""
         if not self._connected:
             return
 
@@ -137,14 +127,6 @@ class Agent:
     @property
     def tools(self) -> list[BaseTool]:
         return self._get_all_tools()
-
-    @property
-    def is_connected(self) -> bool:
-        return self._connected
-
-    @property
-    def has_mcp_config(self) -> bool:
-        return self._mcp_manager is not None
 
     @property
     def signature(self) -> Signature:
@@ -212,147 +194,12 @@ class Agent:
 
         return content
 
-    def run(
-        self,
-        input_data: str | dict[str, Any],
-        *,
-        session_id: str = "default",
-    ) -> str | dict[str, Any]:
-        """Run the agent with the given input.
-
-        Note: For agents with MCP tools, use arun() with the async context
-        manager instead, as MCP connections require async operations.
-
-        Args:
-            input_data: The user input. Should be a string for string-type
-                       signatures, or a dict for object-type signatures.
-            session_id: Optional session ID for conversation history management.
-                       Different session IDs maintain separate conversation histories.
-
-        Returns:
-            The agent's response. Returns a string for string-type output
-            signatures, or a parsed dict/list for other output types.
-
-        Raises:
-            InputValidationError: If input doesn't match the input signature.
-            OutputValidationError: If the LLM response doesn't match the output signature.
-            AgentError: If there's an error during agent execution.
-        """
-        try:
-            # Prepare and validate input
-            user_input = self._prepare_input(input_data)
-
-            # Get session history
-            session_history = self._get_session_history(session_id)
-
-            # Save the original input for history before schema augmentation
-            original_input = user_input
-
-            # Build messages
-            messages: list[Any] = self._build_messages(user_input, session_history)
-
-            # Max iterations for tool use
-            max_iterations = (
-                self.max_iterations if self.max_iterations is not None else 10
-            )
-            iterations = 0
-            response = None
-
-            # Main agent loop to handle tool calls
-            while iterations < max_iterations:
-                # Invoke the LLM
-                response = self._model.invoke(messages)
-
-                # If no tool calls, we're done
-                if not response.tool_calls:
-                    break
-
-                # Add the assistant message (containing tool calls) to the conversation
-                messages.append(response)
-
-                # Execute tool calls
-                for tool_call in response.tool_calls:
-                    # Find the tool
-                    tool_name = tool_call["name"]
-                    tool = next((t for t in self.tools if t.name == tool_name), None)
-
-                    if tool is None:
-                        tool_output = f"Error: Tool '{tool_name}' not found."
-                    else:
-                        try:
-                            # Run the tool
-                            tool_output = tool.invoke(tool_call["args"])
-                        except Exception as e:
-                            tool_output = f"Error executing tool '{tool_name}': {e}"
-
-                    # Add tool response to messages
-                    messages.append(
-                        ToolMessage(
-                            content=str(tool_output),
-                            tool_call_id=tool_call["id"],
-                        )
-                    )
-
-                iterations += 1
-
-            if iterations >= max_iterations and response and response.tool_calls:
-                logger.warning(
-                    f"Max iterations ({max_iterations}) reached with "
-                    f"{len(response.tool_calls)} pending tool calls: "
-                    f"{[tc['name'] for tc in response.tool_calls]}"
-                )
-
-            if response is None:
-                raise AgentError("No response from LLM")
-
-            # Extract content from response
-            response_content = self._extract_response_content(response)
-
-            # Validate and coerce output
-            output_schema = self._signature.output
-            result = coerce_output_to_schema(response_content, output_schema)
-
-            # Update session history
-            session_history.append(HumanMessage(content=original_input))
-            session_history.append(AIMessage(content=response_content))
-
-            return result
-
-        except InputValidationError:
-            raise
-        except OutputValidationError:
-            raise
-        except Exception as e:
-            if isinstance(e, AgentError):
-                raise
-            raise AgentError(f"Agent execution failed: {e}") from e
-
     async def arun(
         self,
         input_data: str | dict[str, Any],
         *,
         session_id: str = "default",
     ) -> str | dict[str, Any]:
-        """Async version of run().
-
-        When using MCP tools, this method should be called within an
-        async context manager:
-
-            async with Agent(afm) as agent:
-                response = await agent.arun("Hello!")
-
-        Args:
-            input_data: The user input.
-            session_id: Optional session ID for conversation history management.
-
-        Returns:
-            The agent's response.
-
-        Raises:
-            InputValidationError: If input doesn't match the input signature.
-            OutputValidationError: If the LLM response doesn't match the output signature.
-            AgentError: If there's an error during agent execution.
-        """
         try:
             # Prepare and validate input
             user_input = self._prepare_input(input_data)
@@ -427,7 +274,7 @@ class Agent:
             output_schema = self._signature.output
             result = coerce_output_to_schema(response_content, output_schema)
 
-            # Update session history (only Human and AI messages for simplicity in get_history)
+            # Update session history
             session_history.append(HumanMessage(content=original_input))
             session_history.append(AIMessage(content=response_content))
 
@@ -445,22 +292,3 @@ class Agent:
     def clear_history(self, session_id: str = "default") -> None:
         if session_id in self._sessions:
             del self._sessions[session_id]
-
-    def clear_all_history(self) -> None:
-        self._sessions.clear()
-
-    def get_session_ids(self) -> list[str]:
-        return list(self._sessions.keys())
-
-    def get_history(
-        self,
-        session_id: str = "default",
-    ) -> list[dict[str, str]]:
-        history = self._get_session_history(session_id)
-        result = []
-        for msg in history:
-            if isinstance(msg, HumanMessage):
-                result.append({"role": "user", "content": str(msg.content)})
-            elif isinstance(msg, AIMessage):
-                result.append({"role": "assistant", "content": str(msg.content)})
-        return result

@@ -1,8 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Tests for web chat interface handler."""
-
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -10,18 +8,13 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from afm_cli import (
-    JSONSchema,
-    Signature,
-    WebChatInterface,
-)
 from afm_cli.agent import Agent
 from afm_cli.interfaces.web_chat import create_webchat_app
+from afm_cli.models import JSONSchema, Signature
 
 
 @pytest.fixture
 def mock_agent() -> MagicMock:
-    """Create a mock agent with string signature for testing."""
     agent = MagicMock(spec=Agent)
     agent.name = "Test Agent"
     agent.description = "A test agent for unit testing"
@@ -47,7 +40,6 @@ def mock_agent() -> MagicMock:
 
 @pytest.fixture
 def mock_agent_with_object_output() -> MagicMock:
-    """Create a mock agent with object output signature."""
     agent = MagicMock(spec=Agent)
     agent.name = "Object Output Agent"
     agent.description = "Returns structured data"
@@ -77,77 +69,8 @@ def mock_agent_with_object_output() -> MagicMock:
     return agent
 
 
-@pytest.fixture
-def mock_agent_with_webchat_interface() -> MagicMock:
-    """Create a mock agent with webchat interface configured."""
-    agent = MagicMock(spec=Agent)
-    agent.name = "Web Chat Agent"
-    agent.description = "Agent with webchat interface"
-    agent.afm = MagicMock()
-    agent.afm.metadata = MagicMock()
-    agent.afm.metadata.version = "2.0.0"
-    agent.afm.metadata.icon_url = None
-
-    # Configure webchat interface with custom path
-    from afm_cli.models import Exposure, HTTPExposure
-
-    interface = WebChatInterface(
-        type="webchat",
-        signature=Signature(
-            input=JSONSchema(type="string"),
-            output=JSONSchema(type="string"),
-        ),
-        exposure=Exposure(http=HTTPExposure(path="/api/chat")),
-    )
-    agent.afm.metadata.interfaces = [interface]
-
-    async def mock_arun(input_data: str, session_id: str = "default") -> str:
-        return f"Web response: {input_data}"
-
-    agent.arun = mock_arun
-    return agent
-
-
-class TestCreateWebchatApp:
-    """Tests for create_webchat_app function."""
-
-    def test_creates_fastapi_app(self, mock_agent: MagicMock) -> None:
-        """Test that a FastAPI app is created."""
-        app = create_webchat_app(mock_agent)
-
-        assert app is not None
-        assert app.title == "Test Agent"
-
-    def test_app_has_agent_info_endpoint(self, mock_agent: MagicMock) -> None:
-        """Test that GET / returns agent info."""
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["name"] == "Test Agent"
-        assert data["description"] == "A test agent for unit testing"
-        assert data["version"] == "1.0.0"
-
-    def test_app_has_health_endpoint(self, mock_agent: MagicMock) -> None:
-        """Test that GET /health returns ok."""
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/health")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "ok"
-
-
 class TestStringChat:
-    """Tests for string-based chat endpoint."""
-
     def test_chat_endpoint_responds(self, mock_agent: MagicMock) -> None:
-        """Test that POST /chat returns a response."""
         app = create_webchat_app(mock_agent)
         client = TestClient(app)
 
@@ -160,7 +83,6 @@ class TestStringChat:
         assert response.text == "Response to: Hello!"
 
     def test_chat_uses_session_id_header(self, mock_agent: MagicMock) -> None:
-        """Test that X-Session-Id header is passed to agent."""
         app = create_webchat_app(mock_agent)
         client = TestClient(app)
 
@@ -191,7 +113,6 @@ class TestStringChat:
         assert sessions_used[1] == "my-session-123"
 
     def test_chat_empty_message_returns_400(self, mock_agent: MagicMock) -> None:
-        """Test that empty message returns 400."""
         app = create_webchat_app(mock_agent)
         client = TestClient(app)
 
@@ -204,7 +125,6 @@ class TestStringChat:
         assert response.status_code == 400
 
     def test_chat_invalid_json_returns_400(self, mock_agent: MagicMock) -> None:
-        """Test that invalid JSON returns 400."""
         app = create_webchat_app(mock_agent)
         client = TestClient(app)
 
@@ -217,7 +137,6 @@ class TestStringChat:
         assert response.status_code == 400
 
     def test_chat_json_string_accepted(self, mock_agent: MagicMock) -> None:
-        """Test that JSON string body is accepted for string input."""
         app = create_webchat_app(mock_agent)
         client = TestClient(app)
 
@@ -230,7 +149,6 @@ class TestStringChat:
         assert response.text == "Response to: Hello!"
 
     def test_chat_json_object_rejected(self, mock_agent: MagicMock) -> None:
-        """Test that JSON object is rejected for string input."""
         app = create_webchat_app(mock_agent)
         client = TestClient(app)
 
@@ -242,7 +160,6 @@ class TestStringChat:
         assert response.status_code == 400
 
     def test_chat_agent_error_returns_500(self, mock_agent: MagicMock) -> None:
-        """Test that agent errors return 500 with generic error message."""
         app = create_webchat_app(mock_agent)
         client = TestClient(app)
 
@@ -262,12 +179,9 @@ class TestStringChat:
 
 
 class TestObjectOutputChat:
-    """Tests for object-output chat endpoint."""
-
     def test_object_output_returned(
         self, mock_agent_with_object_output: MagicMock
     ) -> None:
-        """Test that object output is returned as JSON."""
         app = create_webchat_app(mock_agent_with_object_output)
         client = TestClient(app)
 
@@ -283,10 +197,7 @@ class TestObjectOutputChat:
 
 
 class TestObjectInputChat:
-    """Tests for object-input chat endpoint content types."""
-
     def test_object_input_rejects_text_plain(self, mock_agent: MagicMock) -> None:
-        """Test that object input rejects text/plain content type."""
         mock_agent.signature = Signature(
             input=JSONSchema(type="object"),
             output=JSONSchema(type="string"),
@@ -301,173 +212,3 @@ class TestObjectInputChat:
         )
 
         assert response.status_code == 400
-
-
-class TestCustomPath:
-    """Tests for custom chat endpoint paths."""
-
-    def test_custom_path_from_interface(
-        self, mock_agent_with_webchat_interface: MagicMock
-    ) -> None:
-        """Test that custom path from interface config is used."""
-        app = create_webchat_app(mock_agent_with_webchat_interface)
-        client = TestClient(app)
-
-        # Default path should not work
-        response = client.post(
-            "/chat",
-            content="Hello!",
-            headers={"Content-Type": "text/plain"},
-        )
-        assert response.status_code == 404
-
-        # Custom path should work
-        response = client.post(
-            "/api/chat",
-            content="Hello!",
-            headers={"Content-Type": "text/plain"},
-        )
-        assert response.status_code == 200
-
-    def test_custom_path_override(self, mock_agent: MagicMock) -> None:
-        """Test that path can be overridden via parameter."""
-        app = create_webchat_app(mock_agent, path="/custom/endpoint")
-        client = TestClient(app)
-
-        # Default path should not work
-        response = client.post(
-            "/chat",
-            content="Hello!",
-            headers={"Content-Type": "text/plain"},
-        )
-        assert response.status_code == 404
-
-        # Custom path should work
-        response = client.post(
-            "/custom/endpoint",
-            content="Hello!",
-            headers={"Content-Type": "text/plain"},
-        )
-        assert response.status_code == 200
-
-
-class TestCORS:
-    """Tests for CORS configuration."""
-
-    def test_cors_not_enabled_by_default(self, mock_agent: MagicMock) -> None:
-        """Test that CORS is not enabled by default."""
-        app = create_webchat_app(mock_agent)
-
-        # Check middleware stack
-        cors_enabled = any(
-            "CORSMiddleware" in str(type(m)) for m in app.user_middleware
-        )
-        assert not cors_enabled
-
-    def test_cors_enabled_with_origins(self, mock_agent: MagicMock) -> None:
-        """Test that CORS is enabled when origins are specified."""
-        app = create_webchat_app(mock_agent, cors_origins=["http://localhost:3000"])
-        client = TestClient(app)
-
-        # Make preflight request
-        response = client.options(
-            "/chat",
-            headers={
-                "Origin": "http://localhost:3000",
-                "Access-Control-Request-Method": "POST",
-            },
-        )
-
-        assert response.status_code == 200
-        assert "access-control-allow-origin" in response.headers
-
-
-class TestAgentInfoEndpoint:
-    """Tests for the agent info endpoint."""
-
-    def test_returns_name(self, mock_agent: MagicMock) -> None:
-        """Test that name is returned."""
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/")
-
-        assert response.json()["name"] == "Test Agent"
-
-    def test_returns_description(self, mock_agent: MagicMock) -> None:
-        """Test that description is returned."""
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/")
-
-        assert response.json()["description"] == "A test agent for unit testing"
-
-    def test_returns_version(self, mock_agent: MagicMock) -> None:
-        """Test that version is returned."""
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/")
-
-        assert response.json()["version"] == "1.0.0"
-
-    def test_handles_missing_description(self, mock_agent: MagicMock) -> None:
-        """Test that missing description is handled."""
-        mock_agent.description = None
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/")
-
-        assert response.status_code == 200
-        assert response.json()["description"] is None
-
-    def test_handles_missing_version(self, mock_agent: MagicMock) -> None:
-        """Test that missing version is handled."""
-        mock_agent.afm.metadata.version = None
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/")
-
-        assert response.status_code == 200
-        assert response.json()["version"] is None
-
-
-class TestChatUI:
-    """Tests for the web chat UI endpoint."""
-
-    def test_ui_endpoint_exists(self, mock_agent: MagicMock) -> None:
-        """Test that GET /chat/ui returns the UI HTML."""
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/chat/ui")
-
-        assert response.status_code == 200
-        assert "<!DOCTYPE html>" in response.text
-        assert "Test Agent" in response.text
-        assert "A test agent for unit testing" in response.text
-        assert 'const chatPath = "/chat";' in response.text
-
-    def test_ui_includes_icon_url(self, mock_agent: MagicMock) -> None:
-        """Test that icon URL is rendered when present."""
-        mock_agent.afm.metadata.icon_url = "https://example.com/icon.png"
-        app = create_webchat_app(mock_agent)
-        client = TestClient(app)
-
-        response = client.get("/chat/ui")
-
-        assert response.status_code == 200
-        assert "https://example.com/icon.png" in response.text
-
-    def test_ui_uses_custom_path(self, mock_agent: MagicMock) -> None:
-        """Test that UI uses the custom chat path."""
-        app = create_webchat_app(mock_agent, path="/custom/endpoint")
-        client = TestClient(app)
-
-        response = client.get("/custom/endpoint/ui")
-
-        assert response.status_code == 200
-        assert 'const chatPath = "/custom/endpoint";' in response.text

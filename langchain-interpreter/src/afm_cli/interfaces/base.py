@@ -1,12 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Base utilities for interface handlers.
-
-This module provides helper functions and protocols for the interface
-implementations (console chat, web chat, webhook).
-"""
-
 from __future__ import annotations
 
 from ..exceptions import InterfaceNotFoundError
@@ -21,7 +15,6 @@ from ..models import (
 
 
 def get_interfaces(afm: AFMRecord) -> list[Interface]:
-    """Get all interfaces from an AFM record."""
     if afm.metadata.interfaces:
         return list(afm.metadata.interfaces)
     # Default to consolechat if no interfaces specified
@@ -42,12 +35,6 @@ def get_interface_by_type(
     raise InterfaceNotFoundError(interface_type.value, available)
 
 
-def get_console_interface(afm: AFMRecord) -> ConsoleChatInterface:
-    interface = get_interface_by_type(afm, InterfaceType.CONSOLE_CHAT)
-    assert isinstance(interface, ConsoleChatInterface)
-    return interface
-
-
 def get_webchat_interface(afm: AFMRecord) -> WebChatInterface:
     interface = get_interface_by_type(afm, InterfaceType.WEB_CHAT)
     assert isinstance(interface, WebChatInterface)
@@ -58,21 +45,6 @@ def get_webhook_interface(afm: AFMRecord) -> WebhookInterface:
     interface = get_interface_by_type(afm, InterfaceType.WEBHOOK)
     assert isinstance(interface, WebhookInterface)
     return interface
-
-
-def get_primary_interface(afm: AFMRecord) -> Interface:
-    interfaces = get_interfaces(afm)
-    return interfaces[0]
-
-
-def has_interface_type(afm: AFMRecord, interface_type: InterfaceType | str) -> bool:
-    if isinstance(interface_type, str):
-        interface_type_str = interface_type
-    else:
-        interface_type_str = interface_type.value
-
-    interfaces = get_interfaces(afm)
-    return any(iface.type == interface_type_str for iface in interfaces)
 
 
 def get_http_path(interface: WebChatInterface | WebhookInterface) -> str:

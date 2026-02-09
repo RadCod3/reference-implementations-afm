@@ -1,8 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Command-line interface for the AFM interpreter."""
-
 from __future__ import annotations
 
 import asyncio
@@ -28,7 +26,6 @@ from .interfaces.webhook import (
     WebSubSubscriber,
     create_webhook_router,
     log_task_exception,
-    resolve_secret,
     subscribe_with_retry,
 )
 from .models import (
@@ -44,11 +41,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# =============================================================================
-# Unified App Factory
-# =============================================================================
-
-
 def create_unified_app(
     agent: Agent,
     *,
@@ -59,27 +51,6 @@ def create_unified_app(
     host: str = "0.0.0.0",
     port: int = 8000,
 ) -> FastAPI:
-    """Create a unified FastAPI app that serves multiple interface types.
-
-    This factory creates a single FastAPI application that can serve both
-    webchat and webhook interfaces on different paths. This follows the
-    pattern from the Ballerina reference implementation.
-
-    Args:
-        agent: The AFM agent to expose.
-        webchat_interface: Optional webchat interface configuration.
-        webhook_interface: Optional webhook interface configuration.
-        cors_origins: Optional list of allowed CORS origins.
-        startup_event: Optional event to signal when MCP connection is complete.
-            Useful for coordinating with other async tasks that need the agent
-            to be connected before proceeding.
-
-    Returns:
-        A FastAPI application with routes for all configured interfaces.
-
-    Raises:
-        ValueError: If neither webchat nor webhook interface is provided.
-    """
     if webchat_interface is None and webhook_interface is None:
         raise ValueError("At least one HTTP interface must be provided")
 
@@ -89,7 +60,7 @@ def create_unified_app(
 
     if webhook_interface is not None:
         subscription = webhook_interface.subscription
-        secret = resolve_secret(subscription.secret)
+        secret = subscription.secret
 
         if subscription.hub and subscription.topic:
             webhook_path = get_http_path(webhook_interface)
@@ -217,14 +188,6 @@ def create_unified_app(
 
 
 def format_validation_output(afm: AFMRecord) -> str:
-    """Format validation output for --dry-run mode.
-
-    Args:
-        afm: The parsed AFM record.
-
-    Returns:
-        Formatted string with agent information.
-    """
     lines: list[str] = []
     lines.append("")
     lines.append("Agent validated successfully")
@@ -286,17 +249,6 @@ def extract_interfaces(
 ) -> tuple[
     ConsoleChatInterface | None, WebChatInterface | None, WebhookInterface | None
 ]:
-    """Extract and validate interfaces from AFM record.
-
-    Args:
-        afm: The parsed AFM record.
-
-    Returns:
-        Tuple of (consolechat, webchat, webhook) interfaces.
-
-    Raises:
-        click.ClickException: If multiple interfaces of the same type are found.
-    """
     interfaces = get_interfaces(afm)
 
     consolechat: ConsoleChatInterface | None = None
@@ -379,7 +331,6 @@ def main(
     HTTP interfaces (webchat, webhook) run on the specified port.
     Console chat runs interactively in the terminal.
     """
-    # Parse AFM file
     try:
         afm = parse_afm_file(str(file))
     except AFMError as e:
@@ -482,7 +433,6 @@ async def _run_http_and_console(
     has_console: bool = False,
     log_file: Path | None = None,
 ) -> None:
-    """Run HTTP server in background and console chat in foreground."""
     # Event to signal when server startup is complete and agent is connected
     startup_event = asyncio.Event()
 
@@ -517,8 +467,6 @@ async def _run_http_and_console(
 
     try:
         # Wait for EITHER server startup to complete OR server to fail.
-        # Without this race, a port-in-use error (or any startup failure)
-        # leaves startup_event unset and we block forever.
         startup_waiter = asyncio.create_task(startup_event.wait())
         done, _pending = await asyncio.wait(
             [server_task, startup_waiter],
@@ -576,7 +524,6 @@ def _run_http_only(
     verbose: bool,
     log_file: Path | None = None,
 ) -> None:
-    """Run HTTP server only (blocking)."""
     # Create unified app (lifespan handles MCP connections)
     app = create_unified_app(
         agent,
@@ -596,7 +543,6 @@ def _run_http_only(
 
 
 async def _run_console_only(agent: Agent) -> None:
-    """Run console chat only."""
     async with agent:
         await async_run_console_chat(agent)
 

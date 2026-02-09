@@ -1,8 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""LLM provider factory for AFM agents."""
-
 from __future__ import annotations
 
 import os
@@ -18,11 +16,9 @@ if TYPE_CHECKING:
     from langchain_openai import ChatOpenAI
 
 
-# Default model names when not specified
 DEFAULT_OPENAI_MODEL = "gpt-4o"
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5"
 
-# Default API URLs
 DEFAULT_OPENAI_URL = "https://api.openai.com/v1"
 DEFAULT_ANTHROPIC_URL = "https://api.anthropic.com"
 
@@ -32,8 +28,6 @@ ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY"
 
 
 def create_model_provider(afm_model: Model | None = None) -> BaseChatModel:
-    """Create a LangChain chat model from AFM model configuration."""
-    # Default to OpenAI if no model specified
     if afm_model is None:
         return _create_openai_model(None)
 
@@ -58,7 +52,6 @@ def _create_openai_model(afm_model: Model | None) -> ChatOpenAI:
             provider="openai",
         ) from e
 
-    # Get configuration values
     api_key = _get_api_key(
         afm_model.authentication if afm_model else None,
         OPENAI_API_KEY_ENV,
@@ -112,8 +105,6 @@ def _get_api_key(
     env_var: str,
     provider: str,
 ) -> str:
-    """Extract API key from authentication config or environment variable."""
-    # Try to get from authentication config
     if auth is not None:
         auth_type = auth.type.lower()
 
@@ -128,8 +119,6 @@ def _get_api_key(
                 provider=provider,
             )
         else:
-            # Try to get the key from extra fields if present
-            # (auth config allows extra fields)
             auth_dict = auth.model_dump(exclude_none=True)
             for key in ["token", "api_key", "key", "apiKey"]:
                 if key in auth_dict and auth_dict[key]:
@@ -145,7 +134,3 @@ def _get_api_key(
         f"or set the {env_var} environment variable.",
         provider=provider,
     )
-
-
-def get_supported_providers() -> list[str]:
-    return ["openai", "anthropic"]

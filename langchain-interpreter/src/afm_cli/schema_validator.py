@@ -1,12 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""JSON Schema validation for AFM interface signatures.
-
-This module provides validation for input/output data against the JSON Schema
-definitions in AFM interface signatures.
-"""
-
 import json
 import re
 from typing import Any
@@ -22,14 +16,6 @@ GENERIC_BLOCK_PATTERN = re.compile(r"```\s*([\s\S]*?)\s*```")
 
 
 def json_schema_to_dict(schema: JSONSchema) -> dict[str, Any]:
-    """Convert a Pydantic JSONSchema model to a dict for jsonschema library.
-
-    Args:
-        schema: The JSONSchema model to convert.
-
-    Returns:
-        A dictionary representation suitable for jsonschema validation.
-    """
     result: dict[str, Any] = {"type": schema.type}
 
     if schema.properties is not None:
@@ -51,8 +37,6 @@ def json_schema_to_dict(schema: JSONSchema) -> dict[str, Any]:
     )
     for key, value in extra_fields.items():
         if value is not None:
-            # Check if the original attribute is a JSONSchema instance
-            # (model_dump serializes it to a plain dict, losing the type)
             original = getattr(schema, key, None)
             if isinstance(original, JSONSchema):
                 result[key] = json_schema_to_dict(original)
@@ -96,14 +80,11 @@ def coerce_output_to_schema(
     response: str,
     schema: JSONSchema,
 ) -> Any:
-    # String type - return as-is
     if schema.type == "string":
         return response
 
-    # Extract JSON from potential code blocks
     json_str = extract_json_from_response(response)
 
-    # Parse JSON
     try:
         data = json.loads(json_str)
     except json.JSONDecodeError as e:
@@ -123,14 +104,6 @@ def coerce_output_to_schema(
 
 
 def build_output_schema_instruction(schema: JSONSchema) -> str:
-    """Build an instruction string for the LLM to produce schema-compliant output.
-
-    Args:
-        schema: The output schema the LLM should conform to.
-
-    Returns:
-        An instruction string to append to the prompt.
-    """
     schema_dict = json_schema_to_dict(schema)
     schema_json = json.dumps(schema_dict, indent=2)
 

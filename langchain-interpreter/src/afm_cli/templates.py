@@ -1,11 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Webhook template compilation and evaluation.
-
-Handles ${http:payload...} and ${http:header...} variable substitution
-in webhook prompt templates.
-"""
 
 from __future__ import annotations
 
@@ -27,61 +22,34 @@ from .models import (
 
 
 def compile_template(template: str) -> CompiledTemplate:
-    """Compile a webhook prompt template into segments.
-
-    Parses the template string and returns a CompiledTemplate containing
-    a sequence of segments that can be:
-    - LiteralSegment: Static text
-    - PayloadVariable: ${http:payload} or ${http:payload.field}
-    - HeaderVariable: ${http:header.HeaderName}
-
-    Non-http variables (like ${env:VAR}) are preserved as literal text.
-
-    Args:
-        template: The raw template string.
-
-    Returns:
-        A CompiledTemplate with parsed segments.
-
-    Raises:
-        TemplateCompilationError: If the template contains invalid syntax.
-    """
     segments: list[TemplateSegment] = []
     pos = 0
 
     while pos < len(template):
-        # Find next ${
         dollar_pos = template.find("${", pos)
 
         if dollar_pos == -1:
-            # No more variables - add remaining text as literal
             if pos < len(template):
                 segments.append(LiteralSegment(text=template[pos:]))
             break
 
-        # Find closing brace
         close_pos = template.find("}", dollar_pos)
 
         if close_pos == -1:
-            # No closing brace - treat rest as literal
             if pos < len(template):
                 segments.append(LiteralSegment(text=template[pos:]))
             break
 
-        # Add text before the variable as literal
         if dollar_pos > pos:
             segments.append(LiteralSegment(text=template[pos:dollar_pos]))
 
-        # Extract variable expression
         var_expr = template[dollar_pos + 2 : close_pos]
 
-        # Check if it's an http: variable
         if var_expr.startswith("http:"):
             http_part = var_expr[5:]  # Remove "http:" prefix
             segment = _parse_http_variable(http_part, var_expr)
             segments.append(segment)
         else:
-            # Non-http variable - preserve as literal
             segments.append(LiteralSegment(text=f"${{{var_expr}}}"))
 
         pos = close_pos + 1
@@ -90,18 +58,6 @@ def compile_template(template: str) -> CompiledTemplate:
 
 
 def _parse_http_variable(http_part: str, full_expr: str) -> TemplateSegment:
-    """Parse an http: variable into a PayloadVariable or HeaderVariable.
-
-    Args:
-        http_part: The part after "http:" (e.g., "payload.field" or "header.Name")
-        full_expr: The full variable expression for error messages
-
-    Returns:
-        PayloadVariable or HeaderVariable segment
-
-    Raises:
-        TemplateCompilationError: If the variable format is invalid
-    """
     if http_part == "payload":
         # Entire payload
         return PayloadVariable(path="")
@@ -137,19 +93,6 @@ def evaluate_template(
     payload: Any,
     headers: dict[str, str | list[str]] | None,
 ) -> str:
-    """Evaluate a compiled template with the given payload and headers.
-
-    Args:
-        compiled: The compiled template to evaluate.
-        payload: The JSON payload from the webhook request.
-        headers: HTTP headers from the webhook request.
-
-    Returns:
-        The evaluated template string.
-
-    Raises:
-        TemplateEvaluationError: If evaluation fails.
-    """
     parts: list[str] = []
 
     for segment in compiled.segments:
@@ -169,7 +112,6 @@ def _handle_payload_variable(
     parts: list[str],
     segment: PayloadVariable,
 ) -> None:
-    """Handle a payload variable by extracting and converting the value."""
     if segment.path == "":
         # Entire payload
         parts.append(json.dumps(payload))
@@ -194,7 +136,6 @@ def _handle_header_variable(
     parts: list[str],
     segment: HeaderVariable,
 ) -> None:
-    """Handle a header variable by extracting the header value."""
     if headers is None:
         raise TemplateEvaluationError(
             f"Cannot resolve header variable '${{http:header.{segment.name}}}': "
@@ -221,24 +162,6 @@ def _handle_header_variable(
 
 
 def access_json_field(payload: Any, path: str) -> Any:
-    """Access a field in a JSON payload using dot/bracket notation.
-
-    Supports:
-    - Dot notation: "field.nested"
-    - Bracket notation with quotes: "['field.with.dots']" or '["field"]'
-    - Array index: "items[0]"
-    - Combined: "data.items[0].name" or "['users.list'][1]['full.name']"
-
-    Args:
-        payload: The JSON payload to access.
-        path: The field path.
-
-    Returns:
-        The value at the specified path.
-
-    Raises:
-        JSONAccessError: If the path is invalid or field not found.
-    """
     if not path:
         return payload
 
@@ -265,7 +188,6 @@ def access_json_field(payload: Any, path: str) -> Any:
 
 
 def _handle_bracket_access(current: Any, remaining: str) -> tuple[Any, str]:
-    """Handle bracket notation access like ['field'] or [0]."""
     # Find closing bracket
     close_bracket = remaining.find("]")
     if close_bracket == -1:
@@ -318,7 +240,6 @@ def _handle_bracket_access(current: Any, remaining: str) -> tuple[Any, str]:
 
 
 def _handle_dot_notation(current: Any, remaining: str) -> tuple[Any, str]:
-    """Handle dot notation access for field.nested or field[0] patterns."""
     # Find next delimiter (., [, or end of string)
     dot_pos = remaining.find(".")
     bracket_pos = remaining.find("[")

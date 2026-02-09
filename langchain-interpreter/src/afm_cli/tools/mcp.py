@@ -1,8 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""MCP (Model Context Protocol) integration for AFM agents."""
-
 from __future__ import annotations
 
 import logging
@@ -28,8 +26,6 @@ logger = logging.getLogger(__name__)
 
 
 class BearerAuth(httpx.Auth):
-    """Bearer token authentication for httpx."""
-
     def __init__(self, token: str) -> None:
         self.token = token
 
@@ -39,8 +35,6 @@ class BearerAuth(httpx.Auth):
 
 
 class ApiKeyAuth(httpx.Auth):
-    """API key authentication for httpx."""
-
     def __init__(self, api_key: str, header_name: str = "Authorization") -> None:
         self.api_key = api_key
         self.header_name = header_name
@@ -51,7 +45,6 @@ class ApiKeyAuth(httpx.Auth):
 
 
 def build_httpx_auth(auth: ClientAuthentication | None) -> httpx.Auth | None:
-    """Build httpx Auth instance from authentication configuration."""
     if auth is None:
         return None
 
@@ -87,21 +80,6 @@ def filter_tools(
     tools: list[BaseTool],
     tool_filter: ToolFilter | None,
 ) -> list[BaseTool]:
-    """Apply allow/deny filtering to a list of tools.
-
-    Args:
-        tools: The list of LangChain tools to filter.
-        tool_filter: The filter configuration with allow/deny lists.
-
-    Returns:
-        Filtered list of tools.
-
-    Filter logic:
-        - No filter or empty filter: return all tools
-        - Allow only: return only tools in allow list
-        - Deny only: return all tools except those in deny list
-        - Both allow and deny: return tools in allow list minus those in deny list
-    """
     if tool_filter is None:
         return tools
 
@@ -131,12 +109,6 @@ def filter_tools(
 
 
 class MCPClient:
-    """Client for a single MCP server connection.
-
-    This class wraps the langchain-mcp-adapters client for a single server,
-    handling authentication and tool filtering as specified in the AFM config.
-    """
-
     def __init__(
         self,
         name: str,
@@ -210,12 +182,6 @@ class MCPClient:
 
 
 class MCPManager:
-    """Manager for multiple MCP server connections.
-
-    This class manages connections to multiple MCP servers and provides
-    aggregated access to all tools.
-    """
-
     def __init__(self, servers: list[MCPServer]) -> None:
         """Initialize the MCP manager."""
         self._servers = servers
@@ -244,11 +210,9 @@ class MCPManager:
 
     @property
     def server_names(self) -> list[str]:
-        """Get the names of all configured servers."""
         return [client.name for client in self._clients]
 
     async def get_tools(self) -> list[BaseTool]:
-        """Get all LangChain tools from all connected MCP servers."""
         if self._tools is not None:
             return self._tools
 
@@ -277,5 +241,4 @@ class MCPManager:
         return all_tools
 
     def clear_cache(self) -> None:
-        """Clear the cached tools, forcing a refresh on next get_tools() call."""
         self._tools = None

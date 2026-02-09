@@ -1,8 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Console chat interface handler using Textual TUI."""
-
 from __future__ import annotations
 
 import logging
@@ -22,8 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 class ChatApp(App):
-    """Textual application for the chat interface."""
-
     CSS_PATH = "console_chat.tcss"
     BINDINGS = [
         ("ctrl+q", "quit", "Quit"),
@@ -36,25 +32,17 @@ class ChatApp(App):
         agent: Agent,
         session_id: str | None = None,
     ):
-        """Initialize the chat app.
-
-        Args:
-            agent: The AFM agent instance.
-            session_id: Optional session ID. If None, one is generated.
-        """
         super().__init__()
         self.agent = agent
         self.session_id = session_id or str(uuid.uuid4())
 
     def compose(self) -> ComposeResult:
-        """Compose the layout of the app."""
         yield Header()
         yield VerticalScroll(id="chat-log")
         yield Input(placeholder="Type a message...", id="chat-input")
         yield Footer()
 
     def on_mount(self) -> None:
-        """Called when the app is mounted."""
         logger.debug("ChatApp.on_mount called")
         self.title = f"Chat with {self.agent.name}"
         if self.agent.description:
@@ -71,7 +59,6 @@ class ChatApp(App):
         self.query_one("#chat-input").focus()
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle input submission."""
         logger.debug(f"on_input_submitted triggered. Value: '{event.value}'")
         try:
             user_input = event.value.strip()
@@ -112,7 +99,6 @@ class ChatApp(App):
 
     @work(exclusive=True)
     async def _send_message(self, user_input: str) -> None:
-        """Send message to agent and display response."""
         logger.debug(f"Sending message to agent: {user_input}")
 
         try:
@@ -164,7 +150,6 @@ class ChatApp(App):
                 logger.exception(f"Could not report error to UI: {e2}")
 
     def action_show_help(self) -> None:
-        """Show help message."""
         help_msg = (
             "Available commands:\n"
             "  exit, quit, Ctrl+Q  - End the chat session\n"
@@ -185,21 +170,10 @@ class ChatApp(App):
         self.query_one("#chat-log").scroll_end()
 
 
-def run_console_chat(
-    agent: Agent,
-    *,
-    session_id: str | None = None,
-) -> None:
-    """Run an interactive console chat session with the agent."""
-    app = ChatApp(agent, session_id=session_id)
-    app.run()
-
-
 async def async_run_console_chat(
     agent: Agent,
     *,
     session_id: str | None = None,
 ) -> None:
-    """Async version of run_console_chat."""
     app = ChatApp(agent, session_id=session_id)
     await app.run_async()

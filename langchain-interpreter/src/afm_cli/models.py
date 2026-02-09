@@ -1,8 +1,6 @@
 # Copyright (c) 2025
 # Licensed under the Apache License, Version 2.0
 
-"""Pydantic models for AFM (Agent-Flavored Markdown) specification v0.3.0."""
-
 from __future__ import annotations
 
 from enum import Enum
@@ -12,8 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Provider(BaseModel):
-    """Agent provider information."""
-
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = None
@@ -21,15 +17,6 @@ class Provider(BaseModel):
 
 
 class ClientAuthentication(BaseModel):
-    """Authentication configuration for client connections.
-
-    The 'type' field determines which additional fields are needed:
-    - bearer: requires 'token' field
-    - basic: requires 'username' and 'password' fields
-    - api-key: requires 'api_key' field
-    - oauth2, jwt: implementation-specific fields
-    """
-
     model_config = ConfigDict(extra="allow")
 
     type: str
@@ -40,7 +27,6 @@ class ClientAuthentication(BaseModel):
 
     @model_validator(mode="after")
     def validate_type_fields(self) -> Self:
-        """Validate that the required fields for each type are present."""
         match self.type.lower():
             case "bearer":
                 if self.token is None:
@@ -57,8 +43,6 @@ class ClientAuthentication(BaseModel):
 
 
 class Model(BaseModel):
-    """AI model configuration that powers the agent."""
-
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = None
@@ -68,14 +52,10 @@ class Model(BaseModel):
 
 
 class TransportType(str, Enum):
-    """Supported transport types for MCP connections."""
-
     HTTP = "http"
 
 
 class Transport(BaseModel):
-    """MCP server transport configuration."""
-
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["http"] = "http"
@@ -84,8 +64,6 @@ class Transport(BaseModel):
 
 
 class ToolFilter(BaseModel):
-    """Tool filtering configuration for MCP servers."""
-
     model_config = ConfigDict(extra="forbid")
 
     allow: list[str] | None = None
@@ -93,8 +71,6 @@ class ToolFilter(BaseModel):
 
 
 class MCPServer(BaseModel):
-    """MCP server connection configuration."""
-
     model_config = ConfigDict(extra="forbid")
 
     name: str
@@ -103,19 +79,12 @@ class MCPServer(BaseModel):
 
 
 class Tools(BaseModel):
-    """Container for tool configurations."""
-
     model_config = ConfigDict(extra="forbid")
 
     mcp: list[MCPServer] | None = None
 
 
 class JSONSchema(BaseModel):
-    """JSON Schema definition for interface signatures.
-
-    Follows JSON Schema specification for defining input/output contracts.
-    """
-
     model_config = ConfigDict(extra="allow")
 
     type: str
@@ -126,8 +95,6 @@ class JSONSchema(BaseModel):
 
 
 class Signature(BaseModel):
-    """Input/output signature for agent interfaces."""
-
     model_config = ConfigDict(extra="forbid")
 
     input: JSONSchema = Field(default_factory=lambda: JSONSchema(type="string"))
@@ -138,24 +105,18 @@ class Signature(BaseModel):
 
 
 class HTTPExposure(BaseModel):
-    """HTTP exposure configuration for web interfaces."""
-
     model_config = ConfigDict(extra="forbid")
 
     path: str
 
 
 class Exposure(BaseModel):
-    """Interface exposure configuration."""
-
     model_config = ConfigDict(extra="forbid")
 
     http: HTTPExposure | None = None
 
 
 class Subscription(BaseModel):
-    """Webhook subscription configuration."""
-
     model_config = ConfigDict(extra="forbid")
 
     protocol: str
@@ -167,16 +128,12 @@ class Subscription(BaseModel):
 
 
 class InterfaceType(str, Enum):
-    """Supported interface types."""
-
     CONSOLE_CHAT = "consolechat"
     WEB_CHAT = "webchat"
     WEBHOOK = "webhook"
 
 
 class ConsoleChatInterface(BaseModel):
-    """Console chat interface configuration."""
-
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["consolechat"] = "consolechat"
@@ -184,8 +141,6 @@ class ConsoleChatInterface(BaseModel):
 
 
 class WebChatInterface(BaseModel):
-    """Web chat interface configuration."""
-
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["webchat"] = "webchat"
@@ -196,8 +151,6 @@ class WebChatInterface(BaseModel):
 
 
 class WebhookInterface(BaseModel):
-    """Webhook interface configuration."""
-
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["webhook"] = "webhook"
@@ -217,11 +170,6 @@ Interface = Annotated[
 
 
 class AgentMetadata(BaseModel):
-    """Complete YAML frontmatter content from an AFM file.
-
-    All fields are optional as per AFM specification.
-    """
-
     model_config = ConfigDict(extra="forbid")
 
     spec_version: str | None = None
@@ -240,12 +188,6 @@ class AgentMetadata(BaseModel):
 
 
 class AFMRecord(BaseModel):
-    """Complete parsed AFM file.
-
-    Contains the parsed metadata from YAML frontmatter and the
-    Role and Instructions sections from the Markdown body.
-    """
-
     model_config = ConfigDict(extra="forbid")
 
     metadata: AgentMetadata
@@ -254,8 +196,6 @@ class AFMRecord(BaseModel):
 
 
 class LiteralSegment(BaseModel):
-    """A literal text segment in a compiled template."""
-
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["literal"] = "literal"
@@ -263,15 +203,6 @@ class LiteralSegment(BaseModel):
 
 
 class PayloadVariable(BaseModel):
-    """A payload variable segment in a compiled template.
-
-    The path can be:
-    - Empty string: refers to the entire payload
-    - Dot notation: "field.nested"
-    - Bracket notation: "['field.with.dots']"
-    - Array access: "items[0]"
-    """
-
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["payload"] = "payload"
@@ -279,8 +210,6 @@ class PayloadVariable(BaseModel):
 
 
 class HeaderVariable(BaseModel):
-    """A header variable segment in a compiled template."""
-
     model_config = ConfigDict(frozen=True)
 
     kind: Literal["header"] = "header"
@@ -294,34 +223,6 @@ TemplateSegment = Annotated[
 
 
 class CompiledTemplate(BaseModel):
-    """A compiled webhook prompt template.
-
-    Contains a list of segments that can be literal text,
-    payload variable references, or header variable references.
-    """
-
     model_config = ConfigDict(frozen=True)
 
     segments: tuple[TemplateSegment, ...]
-
-
-def get_filtered_tools(tool_filter: ToolFilter | None) -> list[str] | None:
-    """Apply tool filtering based on allow/deny lists."""
-    if tool_filter is None:
-        return None
-
-    allow = tool_filter.allow
-    deny = tool_filter.deny
-
-    if allow is None and deny is None:
-        return None
-
-    if allow is None:
-        # Only deny specified - caller handles filtering
-        return None
-
-    if deny is None:
-        return allow
-
-    # Both specified - return allow minus deny
-    return [tool for tool in allow if tool not in deny]
