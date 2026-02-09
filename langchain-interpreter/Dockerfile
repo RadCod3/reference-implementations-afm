@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.13-alpine AS builder
 
 # Install uv for fast dependency management
 COPY --from=ghcr.io/astral-sh/uv:0.10.0 /uv /uvx /bin/
@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-editable
 
 # Stage 2: Final image
-FROM python:3.11-slim-bookworm
+FROM python:3.13-alpine
 
 # Set working directory
 WORKDIR /app

@@ -49,3 +49,9 @@ dev = [
     "ty>=0.0.15",
     "asgi-lifespan>=2.1.0",
 ]
+
+[tool.uv]
+constraint-dependencies = [
+    "wheel>=0.46.0",
+    "jaraco-context>=6.0.0",
+]
