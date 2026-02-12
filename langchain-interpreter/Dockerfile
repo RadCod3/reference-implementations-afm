@@ -13,17 +13,19 @@ ENV UV_NO_DEV=1
 WORKDIR /app
 
 # Install dependencies first (for better caching)
-COPY uv.lock pyproject.toml ./
+COPY uv.lock pyproject.toml README.md ./
+COPY packages/afm-core/pyproject.toml packages/afm-core/README.md packages/afm-core/
+COPY packages/afm-langchain/pyproject.toml packages/afm-langchain/README.md packages/afm-langchain/
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-editable
+    uv sync --frozen --no-install-workspace --no-editable
 
-# Copy the source code into the builder stage
-COPY src/ ./src/
-COPY README.md ./
+# Copy workspace packages source
+COPY packages/afm-core/src/ packages/afm-core/src/
+COPY packages/afm-langchain/src/ packages/afm-langchain/src/
 
-# Sync the project (installs the current project into the venv)
+# Install only the packages we need (not afm-cli)
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-editable
+    uv sync --frozen --no-editable --package afm-core --package afm-langchain
 
 # Stage 2: Final image
 FROM python:3.13-alpine
