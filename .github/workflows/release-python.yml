@@ -271,7 +271,6 @@ jobs:
         env:
           BRANCH: ${{ inputs.branch }}
           PACKAGE: ${{ inputs.package }}
-          NEXT_VERSION: ${{ needs.validate.outputs.next_version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -279,13 +278,13 @@ jobs:
 
           cd langchain-interpreter
           if [ "$PACKAGE" = "afm-core" ]; then
-            uv version "$NEXT_VERSION" --package afm-core --frozen
-            uv version "$NEXT_VERSION" --package afm-cli --frozen
+            uv version --bump patch --package afm-core --frozen
+            uv version --bump patch --package afm-cli --frozen
           elif [ "$PACKAGE" = "afm-langchain" ]; then
-            uv version "$NEXT_VERSION" --package afm-langchain --frozen
+            uv version --bump patch --package afm-langchain --frozen
           fi
           cd ..
 
           git add langchain-interpreter/packages/
-          git commit -m "Bump langchain-interpreter $PACKAGE version to $NEXT_VERSION"
+          git commit -m "Bump langchain-interpreter $PACKAGE versions to next patch"
           git push origin "$BRANCH"
