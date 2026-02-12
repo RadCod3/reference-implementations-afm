@@ -1,6 +1,47 @@
 # Release Flow
 
-## Normal Release (e.g., 0.1.0 from main)
+This repository has two separate release workflows:
+
+- **`release-python.yml`** — for the `langchain-interpreter` (Python, multi-package)
+- **`release.yml`** — for the `ballerina-interpreter` (and future non-Python implementations)
+
+Both workflows call `release-finalize.yml` to create tags, release branches, and GitHub Releases.
+
+---
+
+## Langchain Interpreter (Python)
+
+The langchain-interpreter workspace contains independently versioned packages:
+- **`afm-core`** — released together with `afm-cli` (lockstep version)
+- **`afm-langchain`** — released independently
+
+### Normal Release
+
+**Trigger:** Run `release-python.yml` with:
+- package: `afm-core` or `afm-langchain`
+- branch: `main`
+
+**What happens:**
+1. Reads version from `langchain-interpreter/packages/<package>/pyproject.toml`
+2. Validates tag and release branch don't exist
+3. Runs tests (`pytest packages/afm-core/tests/ packages/afm-langchain/tests/`)
+4. Builds and publishes to PyPI:
+   - `afm-core`: publishes `afm-core` then `afm-cli`
+   - `afm-langchain`: publishes `afm-langchain`
+5. If `afm-langchain`: builds/pushes Docker image to `ghcr.io/{owner}/afm-langchain-interpreter:v<version>`
+6. Creates tag `<package>-v<version>` (e.g., `afm-core-v0.1.0`)
+7. Creates release branch and GitHub Release
+8. Bumps package version to next patch:
+   - `afm-core`: bumps both `afm-core` and `afm-cli`
+   - `afm-langchain`: bumps only `afm-langchain`
+
+**Note:** `:latest` Docker tag is only updated when releasing from `main` or `dev`.
+
+---
+
+## Ballerina Interpreter
+
+### Normal Release (e.g., 0.1.0 from main)
 
 **Before:**
 - `main` branch: `Ballerina.toml` version = `0.1.0`
@@ -10,17 +51,15 @@
 - branch: `main`
 
 **What happens:**
-1. Validates version in `Ballerina.toml` is in `X.Y.Z` format
-2. Checks tag and release branch don't already exist
+1. Reads version from `Ballerina.toml`
+2. Validates tag and release branch don't exist
 3. Runs `bal build` and `bal test`
-4. Creates branch `release-ballerina-interpreter-0.1.0` from main
-5. Builds and pushes Docker image to `ghcr.io/{owner}/afm-ballerina-interpreter:v0.1.0` and `:latest`
-6. Creates tag `ballerina-interpreter-v0.1.0`
-7. Pushes release branch and tag
-8. On `main`: bumps `Ballerina.toml` version to `0.1.1`, commits, pushes
-9. Creates GitHub Release with auto-generated notes
+4. Builds and pushes Docker image to `ghcr.io/{owner}/afm-ballerina-interpreter:v0.1.0` and `:latest`
+5. Creates tag `ballerina-interpreter-v0.1.0`
+6. Creates release branch and GitHub Release
+7. Bumps `Ballerina.toml` version to `0.1.1`
 
-**Note:** `:latest` Docker tag is only updated when releasing from `main` or `dev` branch.
+**Note:** `:latest` Docker tag is only updated when releasing from `main` or `dev`.
 
 **After:**
 - `main` branch: `Ballerina.toml` version = `0.1.1`
@@ -30,7 +69,7 @@
 
 ---
 
-## Patch Release (e.g., 0.1.1 after 0.2.0 exists)
+### Patch Release (e.g., 0.1.1 after 0.2.0 exists)
 
 **Scenario:** main is at `0.2.1`, need to patch 0.1.x
 
@@ -80,10 +119,20 @@ git push origin ballerina-interpreter-v0.1.x
 
 ---
 
+## Workflow Files
+
+| File | Purpose |
+|------|---------|
+| `release-python.yml` | Dispatch: langchain-interpreter releases (PyPI + Docker + tag) |
+| `release-common.yml` | Dispatch: ballerina-interpreter releases (Docker + tag) |
+| `release-finalize.yml` | Shared: create tag, release branch, and GitHub Release |
+| `re-release.yml` | Dispatch: re-release an existing version (CODEOWNERS only) |
+
 ## Summary
 
-| Action | Workflow | Who | Bumps Version? |
-|--------|----------|-----|----------------|
-| New release | `release.yml` | Anyone | Yes |
-| Patch release | `release.yml` (from patch branch) | Anyone | Yes |
-| Re-release | `re-release.yml` | CODEOWNERS only | No |
+| Action | Workflow | Implementations | Bumps Version? |
+|--------|----------|-----------------|----------------|
+| New release (Python) | `release-python.yml` | langchain-interpreter | Yes |
+| New release (generic) | `release-common.yml` | ballerina-interpreter | Yes |
+| Patch release | Same as above (from patch branch) | Any | Yes |
+| Re-release | `re-release.yml` | Any | No |
