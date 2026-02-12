@@ -231,7 +231,12 @@ jobs:
 
   finalize:
     needs: [validate, pypi-publish, docker]
-    if: ${{ !cancelled() && needs.validate.result == 'success' && needs.pypi-publish.result == 'success' && (needs.docker.result == 'success' || needs.docker.result == 'skipped') }}
+    if: |
+      ${{ !cancelled()
+        && needs.validate.result == 'success'
+        && needs.pypi-publish.result == 'success'
+        && (needs.docker.result == 'success'
+          || needs.docker.result == 'skipped') }}
     uses: ./.github/workflows/release-finalize.yml
     with:
       tag: ${{ needs.validate.outputs.tag }}
@@ -244,6 +249,10 @@ jobs:
 
   bump-version:
     needs: [validate, finalize]
+    if: |
+      ${{ !cancelled()
+        && needs.validate.result == 'success'
+        && needs.finalize.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
