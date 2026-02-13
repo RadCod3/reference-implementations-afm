@@ -112,7 +112,9 @@ def maybe_check_for_updates() -> None:
     try:
         state = UpdateState()
         if not state.is_check_due:
-            logger.debug("Update check not due yet (last: %.0f)", state.data.get("last_check", 0))
+            logger.debug(
+                "Update check not due yet (last: %.0f)", state.data.get("last_check", 0)
+            )
             return
 
         # Spawn detached background process

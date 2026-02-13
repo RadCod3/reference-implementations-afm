@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator
 import click
 import uvicorn
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from .exceptions import AFMError
 from .interfaces.base import get_http_path, get_interfaces
@@ -44,7 +43,6 @@ def create_unified_app(
     *,
     webchat_interface: WebChatInterface | None = None,
     webhook_interface: WebhookInterface | None = None,
-    cors_origins: list[str] | None = None,
     startup_event: asyncio.Event | None = None,
     host: str = "0.0.0.0",
     port: int = 8000,
@@ -127,16 +125,6 @@ def create_unified_app(
         version=agent.afm.metadata.version or "0.0.0",
         lifespan=lifespan,
     )
-
-    # Add CORS middleware if origins specified
-    if cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
 
     # Store agent reference
     app.state.agent = agent
@@ -294,7 +282,14 @@ def _version_callback(ctx: click.Context, _param: click.Parameter, value: bool) 
 
 
 @click.group()
-@click.option("--version", is_flag=True, callback=_version_callback, expose_value=False, is_eager=True, help="Show version information.")
+@click.option(
+    "--version",
+    is_flag=True,
+    callback=_version_callback,
+    expose_value=False,
+    is_eager=True,
+    help="Show version information.",
+)
 @click.pass_context
 def cli(ctx: click.Context) -> None:
     """AFM Agent CLI — parse, validate, and run Agent-Flavored Markdown files."""

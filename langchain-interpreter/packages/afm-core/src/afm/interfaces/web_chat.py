@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
@@ -245,7 +244,6 @@ def create_webchat_router(
 def create_webchat_app(
     agent: AgentRunner,
     *,
-    cors_origins: list[str] | None = None,
     path: str | None = None,
 ) -> FastAPI:
     # Get interface configuration
@@ -264,16 +262,6 @@ def create_webchat_app(
         description=agent.description or f"Web chat interface for {agent.name}",
         version=agent.afm.metadata.version or "0.0.0",
     )
-
-    # Add CORS middleware if origins specified
-    if cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
 
     app.state.agent = agent
 
