@@ -30,11 +30,6 @@ CHECK_INTERVAL = 86400
 # The PyPI package name to check
 PYPI_PACKAGE = "afm-cli"
 
-# ANSI color codes for terminal output
-_YELLOW = "\033[33m"
-_BOLD = "\033[1m"
-_RESET = "\033[0m"
-
 
 def _get_installed_version() -> str | None:
     """Get the installed version of afm-cli using importlib.metadata."""
@@ -162,7 +157,6 @@ def get_update_notification() -> str | None:
         except Exception:
             return None
 
-        # Mark as notified so notify_if_update_available() skips the stderr print
         state.data["notified_version"] = latest
         state.save()
 
@@ -216,15 +210,16 @@ def notify_if_update_available() -> None:
             return
 
         # Print notification to stderr
+        from rich.console import Console
+
         upgrade_cmd = _detect_upgrade_command()
-        print(
-            f"\n{_YELLOW}{_BOLD}A new version of afm is available: "
-            f"{current} → {latest}{_RESET}",
-            file=sys.stderr,
+        console = Console(stderr=True)
+        console.print(
+            f"\n[yellow bold]A new version of afm is available: "
+            f"{current} → {latest}[/]",
         )
-        print(
-            f"{_YELLOW}Run '{_BOLD}{upgrade_cmd}{_RESET}{_YELLOW}' to update.{_RESET}\n",
-            file=sys.stderr,
+        console.print(
+            f"[yellow]Run '[bold]{upgrade_cmd}[/bold]' to update.[/]\n",
         )
 
         # Record that we notified about this version

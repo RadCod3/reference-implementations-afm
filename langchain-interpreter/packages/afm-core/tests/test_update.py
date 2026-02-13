@@ -145,25 +145,28 @@ class TestNotifyIfUpdateAvailable:
         self, mock_version: MagicMock, patch_config_dir: None
     ):
         """Should print notification when update is available and stderr is TTY."""
+        from io import StringIO
+
         state = UpdateState()
         state.data["latest_version"] = "0.2.0"
         state.save()
 
+        buf = StringIO()
+
         with patch("sys.stderr") as mock_stderr:
             mock_stderr.isatty.return_value = True
 
-            notify_if_update_available()
+            from rich.console import Console as RealConsole
 
-        # print() calls write on the file object
-        written = "".join(
-            call.args[0] for call in mock_stderr.write.call_args_list if call.args
-        )
-        assert "0.2.0" in written
-        assert (
-            "pip install -U" in written
-            or "pipx upgrade" in written
-            or "uv tool upgrade" in written
-        )
+            def fake_console(**kwargs):
+                return RealConsole(file=buf, no_color=True)
+
+            with patch("rich.console.Console", side_effect=fake_console):
+                notify_if_update_available()
+
+        output = buf.getvalue()
+        assert "0.2.0" in output
+        assert "afm-cli" in output
 
     @patch("afm.update._get_installed_version", return_value="0.1.0")
     def test_notify_skipped_non_tty(
