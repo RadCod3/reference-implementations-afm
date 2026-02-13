@@ -280,6 +280,9 @@ jobs:
           if [ "$PACKAGE" = "afm-core" ]; then
             uv version --bump patch --package afm-core --frozen
             uv version --bump patch --package afm-cli --frozen
+            # Sync the afm-core exact pin in afm-cli's dependencies
+            NEW_CORE_VERSION=$(uv version --short --package afm-core)
+            sed -i "s/\"afm-core==.*\"/\"afm-core==$NEW_CORE_VERSION\"/" packages/afm-cli/pyproject.toml
           elif [ "$PACKAGE" = "afm-langchain" ]; then
             uv version --bump patch --package afm-langchain --frozen
           fi

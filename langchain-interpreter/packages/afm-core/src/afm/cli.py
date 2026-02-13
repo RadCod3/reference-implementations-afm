@@ -285,8 +285,13 @@ def extract_interfaces(
 
 @click.group()
 @click.version_option(version=__cli_version__, prog_name="afm")
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """AFM Agent CLI — parse, validate, and run Agent-Flavored Markdown files."""
+    from .update import maybe_check_for_updates, notify_if_update_available
+
+    maybe_check_for_updates()
+    ctx.call_on_close(notify_if_update_available)
 
 
 @cli.command()

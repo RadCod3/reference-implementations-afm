@@ -31,10 +31,12 @@ class ChatApp(App):
         self,
         agent: AgentRunner,
         session_id: str | None = None,
+        update_notification: str | None = None,
     ):
         super().__init__()
         self.agent = agent
         self.session_id = session_id or str(uuid.uuid4())
+        self._update_notification = update_notification
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -57,6 +59,10 @@ class ChatApp(App):
         )
         self.query_one("#chat-log").mount(Static(welcome_msg, classes="system-message"))
         self.query_one("#chat-input").focus()
+
+        # Show update toast if available
+        if self._update_notification:
+            self.notify(self._update_notification, timeout=10)
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         logger.debug(f"on_input_submitted triggered. Value: '{event.value}'")
@@ -175,5 +181,8 @@ async def async_run_console_chat(
     *,
     session_id: str | None = None,
 ) -> None:
-    app = ChatApp(agent, session_id=session_id)
+    from ..update import get_update_notification
+
+    update_msg = get_update_notification()
+    app = ChatApp(agent, session_id=session_id, update_notification=update_msg)
     await app.run_async()
