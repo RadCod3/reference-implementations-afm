@@ -14,13 +14,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as meta_version
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from click.testing import CliRunner
-
 from afm.cli import (
     cli,
     create_unified_app,
@@ -32,6 +31,7 @@ from afm.models import (
 )
 from afm.parser import parse_afm_file
 from afm.runner import AgentRunner
+from click.testing import CliRunner
 
 
 @pytest.fixture
@@ -55,7 +55,10 @@ class TestCLIBasics:
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
         assert meta_version("afm-core") in result.output
-        assert meta_version("afm-cli") in result.output
+        try:
+            assert meta_version("afm-cli") in result.output
+        except PackageNotFoundError:
+            assert f"afm-core {meta_version('afm-core')}" in result.output
 
     def test_help(self, runner: CliRunner):
         result = runner.invoke(cli, ["--help"])
@@ -297,6 +300,7 @@ class TestUnifiedAppLifespan:
         self, sample_agent_path: Path
     ):
         import asyncio
+
         from asgi_lifespan import LifespanManager
 
         agent = _make_mock_agent()
