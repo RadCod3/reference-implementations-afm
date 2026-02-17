@@ -3,13 +3,13 @@
 This repository has two separate release workflows:
 
 - **`release-python.yml`** — for the `python-interpreter` (Python, multi-package)
-- **`release.yml`** — for the `ballerina-interpreter` (and future non-Python implementations)
+- **`release-ballerina.yml`** — for the `ballerina-interpreter`
 
-Both workflows call `release-finalize.yml` to create tags, release branches, and GitHub Releases.
+Both workflows call `release-docker.yml` for Docker image builds and `release-finalize.yml` to create tags, release branches, and GitHub Releases.
 
 ---
 
-## Langchain Interpreter (Python)
+## Python Interpreter
 
 The python-interpreter workspace contains independently versioned packages:
 - **`afm-core`** — released together with `afm-cli`
@@ -46,8 +46,7 @@ The python-interpreter workspace contains independently versioned packages:
 **Before:**
 - `main` branch: `Ballerina.toml` version = `0.1.0`
 
-**Trigger:** Run `release.yml` workflow with:
-- implementation: `ballerina-interpreter`
+**Trigger:** Run `release-ballerina.yml` workflow with:
 - branch: `main`
 
 **What happens:**
@@ -84,8 +83,7 @@ git commit -m "Bump version"
 git push origin ballerina-interpreter-v0.1.x
 ```
 
-**Trigger:** Run `release.yml` workflow with:
-- implementation: `ballerina-interpreter`
+**Trigger:** Run `release-ballerina.yml` workflow with:
 - branch: `ballerina-interpreter-v0.1.x`
 
 **What happens:**
@@ -95,44 +93,19 @@ git push origin ballerina-interpreter-v0.1.x
 
 ---
 
-## Re-release (e.g., redo 0.1.0)
-
-**Restricted to:** Users listed in `.github/CODEOWNERS`
-
-**Trigger:** Run `re-release.yml` workflow with:
-- implementation: `ballerina-interpreter`
-- version: `0.1.0`
-- branch: `main` (or whichever branch has the fix)
-- confirm: `RE-RELEASE`
-
-**What happens:**
-1. Verifies user is in CODEOWNERS
-2. Validates version format (`X.Y.Z`)
-3. Deletes existing tag, release branch, and GitHub Release
-4. Runs `bal build` and `bal test`
-5. Creates new release branch `release-ballerina-interpreter-0.1.0`
-6. Builds and pushes Docker (overwrites)
-7. Creates new tag and GitHub Release
-8. Does NOT bump version on source branch (already bumped from original release)
-
-**Note:** `:latest` Docker tag is only updated when re-releasing from `main` or `dev` branch.
-
----
-
 ## Workflow Files
 
 | File | Purpose |
 |------|---------|
 | `release-python.yml` | Dispatch: python-interpreter releases (PyPI + Docker + tag) |
-| `release-common.yml` | Dispatch: ballerina-interpreter releases (Docker + tag) |
+| `release-ballerina.yml` | Dispatch: ballerina-interpreter releases (Docker + tag) |
+| `release-docker.yml` | Shared: build, push, and scan Docker images |
 | `release-finalize.yml` | Shared: create tag, release branch, and GitHub Release |
-| `re-release.yml` | Dispatch: re-release an existing version (CODEOWNERS only) |
 
 ## Summary
 
 | Action | Workflow | Implementations | Bumps Version? |
 |--------|----------|-----------------|----------------|
 | New release (Python) | `release-python.yml` | python-interpreter | Yes |
-| New release (generic) | `release-common.yml` | ballerina-interpreter | Yes |
+| New release (Ballerina) | `release-ballerina.yml` | ballerina-interpreter | Yes |
 | Patch release | Same as above (from patch branch) | Any | Yes |
-| Re-release | `re-release.yml` | Any | No |
