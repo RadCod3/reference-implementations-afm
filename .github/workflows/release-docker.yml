@@ -1,0 +1,98 @@
+name: Release Docker
+
+on:
+  workflow_call:
+    inputs:
+      context:
+        description: 'Docker build context directory (e.g., ballerina-interpreter)'
+        required: true
+        type: string
+      image_name:
+        description: 'Docker image name without registry prefix (e.g., afm-ballerina-interpreter)'
+        required: true
+        type: string
+      version:
+        description: 'Release version (e.g., 0.1.0)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch being released from'
+        required: true
+        type: string
+      image_title:
+        description: 'Human-readable image title for OCI labels (e.g., AFM Ballerina Interpreter)'
+        required: true
+        type: string
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine Docker tags
+        id: docker-tags
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          VERSION: ${{ inputs.version }}
+          UPDATE_LATEST: ${{ inputs.branch == 'main' || inputs.branch == 'dev' }}
+        run: |
+          # GHCR requires lowercase repository names
+          OWNER_LOWER=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
+          FULL_IMAGE="ghcr.io/$OWNER_LOWER/$IMAGE_NAME"
+          TAGS="$FULL_IMAGE:v$VERSION"
+          if [ "$UPDATE_LATEST" = "true" ]; then
+            TAGS="$TAGS,$FULL_IMAGE:latest"
+          fi
+          echo "TAGS=$TAGS" >> $GITHUB_OUTPUT
+          echo "FULL_IMAGE=$FULL_IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ inputs.context }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.docker-tags.outputs.TAGS }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=${{ inputs.image_title }}
+            org.opencontainers.image.licenses=Apache-2.0
+          annotations: |
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Scan Docker image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ steps.docker-tags.outputs.FULL_IMAGE }}:v${{ inputs.version }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          limit-severities-for-sarif: true
+          exit-code: '1'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

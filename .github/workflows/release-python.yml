@@ -160,74 +160,16 @@ jobs:
   docker:
     needs: [validate, pypi-publish]
     if: inputs.package == 'afm-langchain'
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/release-docker.yml
+    with:
+      context: python-interpreter
+      image_name: afm-langchain-interpreter
+      version: ${{ needs.validate.outputs.release_version }}
+      branch: ${{ inputs.branch }}
+      image_title: AFM LangChain Interpreter
     permissions:
       packages: write
       security-events: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.branch }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Determine Docker tags
-        id: docker-tags
-        env:
-          OWNER: ${{ github.repository_owner }}
-          VERSION: ${{ needs.validate.outputs.release_version }}
-          UPDATE_LATEST: ${{ inputs.branch == 'main' || inputs.branch == 'dev' }}
-        run: |
-          OWNER_LOWER=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
-          IMAGE_NAME="ghcr.io/$OWNER_LOWER/afm-langchain-interpreter"
-          TAGS="$IMAGE_NAME:v$VERSION"
-          if [ "$UPDATE_LATEST" = "true" ]; then
-            TAGS="$TAGS,$IMAGE_NAME:latest"
-          fi
-          echo "TAGS=$TAGS" >> $GITHUB_OUTPUT
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_OUTPUT
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: python-interpreter
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.docker-tags.outputs.TAGS }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ needs.validate.outputs.release_version }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.title=AFM LangChain Interpreter
-            org.opencontainers.image.licenses=Apache-2.0
-          annotations: |
-            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            index:org.opencontainers.image.licenses=Apache-2.0
-
-      - name: Scan Docker image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          image-ref: ${{ steps.docker-tags.outputs.IMAGE_NAME }}:v${{ needs.validate.outputs.release_version }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-          limit-severities-for-sarif: true
-          exit-code: '1'
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
 
   finalize:
     needs: [validate, pypi-publish, docker]
