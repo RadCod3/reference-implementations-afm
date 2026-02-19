@@ -82,7 +82,7 @@ jobs:
             index:org.opencontainers.image.licenses=Apache-2.0
 
       - name: Scan Docker image for vulnerabilities
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.34
         with:
           image-ref: ${{ steps.docker-tags.outputs.FULL_IMAGE }}:v${{ inputs.version }}
           format: 'sarif'
