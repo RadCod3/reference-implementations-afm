@@ -14,21 +14,24 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from langchain_core.tools import BaseTool
+from langchain_mcp_adapters.sessions import StdioConnection
 
-from afm.exceptions import MCPConnectionError, MCPError
+from afm.exceptions import MCPConnectionError
 from afm.models import (
     AFMRecord,
     AgentMetadata,
     ClientAuthentication,
+    HttpTransport,
     MCPServer,
+    StdioTransport,
     ToolFilter,
     Tools,
-    Transport,
 )
 from afm_langchain.tools.mcp import (
     ApiKeyAuth,
@@ -60,7 +63,26 @@ def make_mcp_server(
 
     return MCPServer(
         name=name,
-        transport=Transport(type="http", url=url, authentication=auth),
+        transport=HttpTransport(type="http", url=url, authentication=auth),
+        tool_filter=tool_filter,
+    )
+
+
+def make_stdio_mcp_server(
+    name: str = "stdio-server",
+    command: str = "python",
+    args: list[str] | None = None,
+    env: dict[str, str] | None = None,
+    tool_filter: ToolFilter | None = None,
+) -> MCPServer:
+    return MCPServer(
+        name=name,
+        transport=StdioTransport(
+            type="stdio",
+            command=command,
+            args=args,
+            env=env,
+        ),
         tool_filter=tool_filter,
     )
 
@@ -168,17 +190,19 @@ class TestMCPClient:
         client = MCPClient.from_mcp_server(server)
 
         assert client.name == "test"
-        assert client.url == "http://localhost:8080/mcp"
-        assert client.authentication is None
+        assert isinstance(client.transport, HttpTransport)
+        assert client.transport.url == "http://localhost:8080/mcp"
+        assert client.transport.authentication is None
         assert client.tool_filter is None
 
     def test_from_mcp_server_with_auth(self):
         server = make_mcp_server(name="test", auth_type="bearer")
         client = MCPClient.from_mcp_server(server)
 
-        assert client.authentication is not None
-        assert client.authentication.type == "bearer"
-        assert client.authentication.token == "test-token"
+        assert isinstance(client.transport, HttpTransport)
+        assert client.transport.authentication is not None
+        assert client.transport.authentication.type == "bearer"
+        assert client.transport.authentication.token == "test-token"
 
     def test_from_mcp_server_with_tool_filter(self):
         tool_filter = ToolFilter(allow=["tool1", "tool2"])
@@ -188,23 +212,80 @@ class TestMCPClient:
         assert client.tool_filter is not None
         assert client.tool_filter.allow == ["tool1", "tool2"]
 
-    def test_from_mcp_server_unsupported_transport_raises_error(self):
-        server = MCPServer(
-            name="test",
-            transport=Transport(type="http", url="http://localhost:8080"),
+    def test_from_mcp_server_creates_stdio_client(self):
+        server = make_stdio_mcp_server(
+            name="stdio-test",
+            command="python",
+            args=["server.py"],
         )
-        # Manually override the type to simulate invalid transport
-        object.__setattr__(server.transport, "type", "stdio")
+        client = MCPClient.from_mcp_server(server)
 
-        with pytest.raises(MCPError, match="Unsupported transport type"):
-            MCPClient.from_mcp_server(server)
+        assert client.name == "stdio-test"
+        assert isinstance(client.transport, StdioTransport)
+        assert client.transport.command == "python"
+        assert client.transport.args == ["server.py"]
+        assert client.tool_filter is None
+
+    def test_build_connection_config_http(self):
+        server = make_mcp_server(name="test", url="http://localhost:8080/mcp")
+        client = MCPClient.from_mcp_server(server)
+        config = client._build_connection_config()
+
+        assert config["transport"] == "streamable_http"
+        assert config["url"] == "http://localhost:8080/mcp"
+        assert "auth" not in config
+
+    def test_build_connection_config_http_with_auth(self):
+        server = make_mcp_server(name="test", auth_type="bearer")
+        client = MCPClient.from_mcp_server(server)
+        config = client._build_connection_config()
+
+        assert config["transport"] == "streamable_http"
+        assert "auth" in config
+        assert isinstance(config["auth"], BearerAuth)
+
+    def test_build_connection_config_stdio(self):
+        server = make_stdio_mcp_server(
+            name="stdio-test",
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+        )
+        client = MCPClient.from_mcp_server(server)
+        config = cast(StdioConnection, client._build_connection_config())
+
+        assert config["transport"] == "stdio"
+        assert config["command"] == "npx"
+        assert config["args"] == [
+            "-y",
+            "@modelcontextprotocol/server-filesystem",
+            "/tmp",
+        ]
+        assert "env" not in config
+
+    def test_build_connection_config_stdio_with_env(self):
+        server = make_stdio_mcp_server(
+            name="stdio-test",
+            command="python",
+            args=["server.py"],
+            env={"DB_PATH": "./data.db", "API_KEY": "secret"},
+        )
+        client = MCPClient.from_mcp_server(server)
+        config = cast(StdioConnection, client._build_connection_config())
+
+        assert config["transport"] == "stdio"
+        assert config["env"] == {"DB_PATH": "./data.db", "API_KEY": "secret"}
+
+    def test_build_connection_config_stdio_no_args_defaults_to_empty_list(self):
+        server = make_stdio_mcp_server(name="stdio-test", command="python")
+        client = MCPClient.from_mcp_server(server)
+        config = cast(StdioConnection, client._build_connection_config())
+
+        assert config["args"] == []
 
     @pytest.mark.asyncio
     async def test_get_tools_calls_mcp_client(self):
-        client = MCPClient(
-            name="test-server",
-            url="http://localhost:8080/mcp",
-        )
+        server = make_mcp_server(name="test-server", url="http://localhost:8080/mcp")
+        client = MCPClient.from_mcp_server(server)
 
         mock_tools = [make_mock_tool("tool1"), make_mock_tool("tool2")]
 
@@ -221,11 +302,12 @@ class TestMCPClient:
     @pytest.mark.asyncio
     async def test_get_tools_applies_filtering(self):
         tool_filter = ToolFilter(allow=["tool1"])
-        client = MCPClient(
+        server = make_mcp_server(
             name="test-server",
             url="http://localhost:8080/mcp",
             tool_filter=tool_filter,
         )
+        client = MCPClient.from_mcp_server(server)
 
         mock_tools = [make_mock_tool("tool1"), make_mock_tool("tool2")]
 
@@ -241,10 +323,8 @@ class TestMCPClient:
 
     @pytest.mark.asyncio
     async def test_get_tools_connection_error_raises_mcp_error(self):
-        client = MCPClient(
-            name="test-server",
-            url="http://localhost:8080/mcp",
-        )
+        server = make_mcp_server(name="test-server", url="http://localhost:8080/mcp")
+        client = MCPClient.from_mcp_server(server)
 
         with patch("afm_langchain.tools.mcp.MultiServerMCPClient") as MockClient:
             mock_instance = AsyncMock()
@@ -253,6 +333,28 @@ class TestMCPClient:
 
             with pytest.raises(MCPConnectionError, match="Failed to connect"):
                 await client.get_tools()
+
+    @pytest.mark.asyncio
+    async def test_get_tools_stdio_calls_mcp_client(self):
+        server = make_stdio_mcp_server(
+            name="stdio-server",
+            command="python",
+            args=["server.py"],
+        )
+        client = MCPClient.from_mcp_server(server)
+
+        mock_tools = [make_mock_tool("stdio_tool")]
+
+        with patch("afm_langchain.tools.mcp.MultiServerMCPClient") as MockClient:
+            mock_instance = AsyncMock()
+            mock_instance.get_tools.return_value = mock_tools
+            MockClient.return_value = mock_instance
+
+            result = await client.get_tools()
+
+            assert len(result) == 1
+            assert result[0].name == "stdio_tool"
+            mock_instance.get_tools.assert_called_once_with(server_name="stdio-server")
 
 
 class TestMCPManager:
@@ -433,3 +535,37 @@ class TestMCPManager:
             assert tools[1].name == "tool2"
             mock_get1_retry.assert_called_once()
             mock_get2_retry.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_tools_mixed_http_and_stdio_servers(self):
+        servers = [
+            make_mcp_server(name="http-server", url="http://localhost:8080/mcp"),
+            make_stdio_mcp_server(
+                name="stdio-server",
+                command="python",
+                args=["server.py"],
+            ),
+        ]
+        manager = MCPManager(servers)
+
+        assert len(manager._clients) == 2
+        assert isinstance(manager._clients[0].transport, HttpTransport)
+        assert isinstance(manager._clients[1].transport, StdioTransport)
+
+        with (
+            patch.object(
+                manager._clients[0],
+                "get_tools",
+                return_value=[make_mock_tool("http_tool")],
+            ),
+            patch.object(
+                manager._clients[1],
+                "get_tools",
+                return_value=[make_mock_tool("stdio_tool")],
+            ),
+        ):
+            tools = await manager.get_tools()
+
+        assert len(tools) == 2
+        assert tools[0].name == "http_tool"
+        assert tools[1].name == "stdio_tool"
