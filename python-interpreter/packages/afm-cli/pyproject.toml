@@ -1,6 +1,6 @@
 [project]
 name = "afm-cli"
-version = "0.2.8"
+version = "0.2.9"
 description = "AFM CLI metapackage: installs afm-core and afm-langchain"
 readme = "README.md"
 classifiers = [
