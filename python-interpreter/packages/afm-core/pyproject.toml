@@ -1,6 +1,6 @@
 [project]
 name = "afm-core"
-version = "0.1.7"
+version = "0.2.0"
 description = "AFM (Agent-Flavored Markdown) core: parser, CLI, protocols, and interfaces"
 readme = "README.md"
 classifiers = [
