@@ -39,6 +39,7 @@ from .interfaces.webhook import (
 )
 from .models import (
     ConsoleChatInterface,
+    HttpTransport,
     WebChatInterface,
     WebhookInterface,
 )
@@ -232,7 +233,12 @@ def format_validation_output(afm: AFMRecord) -> str:
         lines.append("")
         lines.append("  MCP Servers:")
         for server in afm.metadata.tools.mcp:
-            lines.append(f"    - {server.name}: {server.transport.url}")
+            transport = server.transport
+            if isinstance(transport, HttpTransport):
+                transport_info = transport.url
+            else:
+                transport_info = transport.command
+            lines.append(f"    - {server.name}: {transport_info}")
             if server.tool_filter:
                 if server.tool_filter.allow:
                     lines.append(f"      Allow: {', '.join(server.tool_filter.allow)}")

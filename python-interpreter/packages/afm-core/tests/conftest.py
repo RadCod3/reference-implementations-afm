@@ -47,3 +47,8 @@ def sample_minimal_path(fixtures_dir: Path) -> Path:
 @pytest.fixture
 def sample_no_frontmatter_path(fixtures_dir: Path) -> Path:
     return fixtures_dir / "sample_no_frontmatter.afm.md"
+
+
+@pytest.fixture
+def sample_stdio_mcp_path(fixtures_dir: Path) -> Path:
+    return fixtures_dir / "sample_stdio_mcp_agent.afm.md"

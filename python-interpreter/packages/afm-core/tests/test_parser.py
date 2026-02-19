@@ -19,7 +19,13 @@ from pathlib import Path
 import pytest
 
 from afm.exceptions import AFMParseError, AFMValidationError, VariableResolutionError
-from afm.models import ConsoleChatInterface, WebChatInterface, WebhookInterface
+from afm.models import (
+    ConsoleChatInterface,
+    HttpTransport,
+    StdioTransport,
+    WebChatInterface,
+    WebhookInterface,
+)
 from afm.parser import parse_afm, parse_afm_file
 
 
@@ -56,6 +62,7 @@ class TestParseAfm:
         assert len(result.metadata.tools.mcp) == 1
         mcp_server = result.metadata.tools.mcp[0]
         assert mcp_server.name == "TestServer"
+        assert isinstance(mcp_server.transport, HttpTransport)
         assert mcp_server.transport.url == "https://test-server.com/api"
         assert mcp_server.transport.authentication is not None
         assert mcp_server.transport.authentication.type == "bearer"
@@ -259,6 +266,149 @@ class TestParseAfmFile:
     def test_parse_nonexistent_file(self) -> None:
         with pytest.raises(FileNotFoundError):
             parse_afm_file("/nonexistent/path/agent.afm.md")
+
+
+class TestParseStdioMcpTransport:
+    def test_parse_stdio_mcp_agent(self, sample_stdio_mcp_path: Path) -> None:
+        content = sample_stdio_mcp_path.read_text()
+        result = parse_afm(content)
+
+        assert result.metadata.name == "StdioMcpAgent"
+        assert result.metadata.tools is not None
+        assert result.metadata.tools.mcp is not None
+        assert len(result.metadata.tools.mcp) == 2
+
+        # First server: no args env, no tool_filter
+        server1 = result.metadata.tools.mcp[0]
+        assert server1.name == "filesystem_server"
+        assert isinstance(server1.transport, StdioTransport)
+        assert server1.transport.type == "stdio"
+        assert server1.transport.command == "npx"
+        assert server1.transport.args == [
+            "-y",
+            "@modelcontextprotocol/server-filesystem",
+            "/tmp",
+        ]
+        assert server1.transport.env is None
+        assert server1.tool_filter is None
+
+        # Second server: has env and tool_filter
+        server2 = result.metadata.tools.mcp[1]
+        assert server2.name == "local_db_tool"
+        assert isinstance(server2.transport, StdioTransport)
+        assert server2.transport.type == "stdio"
+        assert server2.transport.command == "python"
+        assert server2.transport.args == ["server.py"]
+        assert server2.transport.env == {"DB_PATH": "./data.db", "API_KEY": "dummy-key"}
+        assert server2.tool_filter is not None
+        assert server2.tool_filter.allow == ["query", "search"]
+        assert server2.tool_filter.deny == ["delete"]
+
+    def test_parse_stdio_transport_inline(self) -> None:
+        content = """---
+spec_version: "0.3.0"
+tools:
+  mcp:
+    - name: "local_tool"
+      transport:
+        type: stdio
+        command: "python"
+        args:
+          - "server.py"
+---
+
+# Role
+Test role.
+
+# Instructions
+Test instructions.
+"""
+        result = parse_afm(content)
+
+        assert result.metadata.tools is not None
+        assert result.metadata.tools.mcp is not None
+        mcp_server = result.metadata.tools.mcp[0]
+        assert isinstance(mcp_server.transport, StdioTransport)
+        assert mcp_server.transport.command == "python"
+        assert mcp_server.transport.args == ["server.py"]
+        assert mcp_server.transport.env is None
+
+    def test_parse_http_transport_produces_http_transport_instance(self) -> None:
+        content = """---
+spec_version: "0.3.0"
+tools:
+  mcp:
+    - name: "remote_tool"
+      transport:
+        type: http
+        url: "https://example.com/mcp"
+---
+
+# Role
+Test role.
+
+# Instructions
+Test instructions.
+"""
+        result = parse_afm(content)
+
+        assert result.metadata.tools is not None
+        assert result.metadata.tools.mcp is not None
+        mcp_server = result.metadata.tools.mcp[0]
+        assert isinstance(mcp_server.transport, HttpTransport)
+        assert mcp_server.transport.url == "https://example.com/mcp"
+
+    def test_parse_stdio_transport_missing_command_raises_error(self) -> None:
+        content = """---
+spec_version: "0.3.0"
+tools:
+  mcp:
+    - name: "broken_tool"
+      transport:
+        type: stdio
+---
+
+# Role
+Test role.
+
+# Instructions
+Test instructions.
+"""
+        with pytest.raises(AFMValidationError):
+            parse_afm(content)
+
+    def test_parse_mixed_http_and_stdio_transports(self) -> None:
+        content = """---
+spec_version: "0.3.0"
+tools:
+  mcp:
+    - name: "remote_server"
+      transport:
+        type: http
+        url: "https://api.example.com/mcp"
+    - name: "local_server"
+      transport:
+        type: stdio
+        command: "npx"
+        args:
+          - "-y"
+          - "@modelcontextprotocol/server-filesystem"
+          - "/tmp"
+---
+
+# Role
+Test role.
+
+# Instructions
+Test instructions.
+"""
+        result = parse_afm(content)
+
+        assert result.metadata.tools is not None
+        assert result.metadata.tools.mcp is not None
+        assert len(result.metadata.tools.mcp) == 2
+        assert isinstance(result.metadata.tools.mcp[0].transport, HttpTransport)
+        assert isinstance(result.metadata.tools.mcp[1].transport, StdioTransport)
 
 
 class TestResolveEnvParameter:

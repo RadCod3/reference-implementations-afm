@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 from .exceptions import AFMValidationError, VariableResolutionError
 from .models import (
     ConsoleChatInterface,
+    HttpTransport,
     WebChatInterface,
     WebhookInterface,
 )
@@ -178,10 +179,14 @@ def validate_http_variables(afm_record: AFMRecord) -> None:
         for server in metadata.tools.mcp:
             if contains_http_variable(server.name):
                 errored_fields.append("tools.mcp.name")
-            if contains_http_variable(server.transport.url):
-                errored_fields.append("tools.mcp.transport.url")
-            if _authentication_contains_http_variable(server.transport.authentication):
-                errored_fields.append("tools.mcp.transport.authentication")
+            # HTTP transport fields: url and authentication
+            if isinstance(server.transport, HttpTransport):
+                if contains_http_variable(server.transport.url):
+                    errored_fields.append("tools.mcp.transport.url")
+                if _authentication_contains_http_variable(
+                    server.transport.authentication
+                ):
+                    errored_fields.append("tools.mcp.transport.authentication")
             if _tool_filter_contains_http_variable(server.tool_filter):
                 errored_fields.append("tools.mcp.tool_filter")
 
