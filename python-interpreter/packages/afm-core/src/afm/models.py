@@ -64,16 +64,27 @@ class Model(BaseModel):
     authentication: ClientAuthentication | None = None
 
 
-class TransportType(str, Enum):
-    HTTP = "http"
-
-
-class Transport(BaseModel):
+class HttpTransport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["http"] = "http"
     url: str
     authentication: ClientAuthentication | None = None
+
+
+class StdioTransport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["stdio"] = "stdio"
+    command: str
+    args: list[str] | None = None
+    env: dict[str, str] | None = None
+
+
+Transport = Annotated[
+    HttpTransport | StdioTransport,
+    Field(discriminator="type"),
+]
 
 
 class ToolFilter(BaseModel):
