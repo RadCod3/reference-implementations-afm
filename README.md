@@ -7,7 +7,7 @@ Reference implementations for [Agent-Flavored Markdown (AFM)](https://wso2.githu
 | Implementation | Language/Framework | Status |
 |----------------|-------------------|--------|
 | [ballerina-interpreter](./ballerina-interpreter) | Ballerina | Active |
-| [python-interpreter](./python-interpreter) | Python/LangChain | Active |
+| [langchain-interpreter](./python-interpreter) | Python/LangChain | Active |
 
 ## Repository Structure
 
