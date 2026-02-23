@@ -23,6 +23,16 @@ This module implements the "Async Discovery + Notify on Next Run" pattern:
 
 The notification is only shown in interactive terminals (TTY) and can be
 disabled via the AFM_NO_UPDATE_CHECK=1 environment variable.
+
+Three installation scenarios are handled:
+
+* **afm-cli installed**: Check ``afm-cli`` on PyPI and suggest the
+  appropriate package-manager upgrade command (pipx / uv / pip).
+* **afm-core only **: Check ``afm-core`` on PyPI and
+  suggest the appropriate upgrade command for ``afm-core``.
+* **Docker / container** (detected via ``AFM_RUNTIME=docker``): Check
+  ``afm-core`` on PyPI but show only a "version available" notice without
+  an upgrade command, since image updates are handled externally.
 """
 
 from __future__ import annotations
@@ -40,16 +50,30 @@ logger = logging.getLogger(__name__)
 # How often to check for updates (seconds) — 24 hours
 CHECK_INTERVAL = 86400
 
-# The PyPI package name to check
-PYPI_PACKAGE = "afm-cli"
 
-
-def _get_installed_version() -> str | None:
-    """Get the installed version of afm-cli using importlib.metadata."""
+def _detect_package() -> str:
+    """Return the PyPI package name that should be used for update checks."""
     try:
         from importlib.metadata import version
 
-        return version(PYPI_PACKAGE)
+        version("afm-cli")
+        return "afm-cli"
+    except Exception:
+        return "afm-core"
+
+
+def _is_docker() -> bool:
+    """Return True when running inside a Docker / container environment."""
+    return os.environ.get("AFM_RUNTIME", "").strip().lower() == "docker"
+
+
+def _get_installed_version() -> str | None:
+    """Get the installed version of the relevant AFM package."""
+    try:
+        from importlib.metadata import version
+
+        package = _detect_package()
+        return version(package)
     except Exception:
         return None
 
@@ -80,7 +104,7 @@ class UpdateState:
                 logger.debug("No update state file found at %s", self.path)
         except (json.JSONDecodeError, OSError, ValueError) as exc:
             logger.debug("Failed to load update state: %s", exc)
-        return {"last_check": 0, "latest_version": None, "notified_version": None}
+        return {"last_check": 0, "latest_version": None}
 
     def save(self) -> None:
         """Persist current state to disk."""
@@ -99,16 +123,22 @@ class UpdateState:
         return (time.time() - last) >= CHECK_INTERVAL
 
 
-def _detect_upgrade_command() -> str:
-    """Detect the installation context and return the appropriate upgrade command string."""
+def _detect_upgrade_command(package: str | None = None) -> str | None:
+    """Return the appropriate upgrade command string, or None in containers."""
+    if _is_docker():
+        return None
+
+    if package is None:
+        package = _detect_package()
+
     executable = sys.executable or ""
 
     if "pipx" in executable:
-        return f"pipx upgrade {PYPI_PACKAGE}"
+        return f"pipx upgrade {package}"
     elif "uv" in executable:
-        return f"uv tool upgrade {PYPI_PACKAGE}"
+        return f"uv tool upgrade {package}"
     else:
-        return f"pip install -U {PYPI_PACKAGE}"
+        return f"pip install -U {package}"
 
 
 def maybe_check_for_updates() -> None:
@@ -153,12 +183,8 @@ def maybe_check_for_updates() -> None:
 
 
 def get_update_notification() -> str | None:
-    """Return a plain-text update notification string, or None if no update.
+    """Return a plain-text update notification string, or None if no update."""
 
-    This is used by the consolechat Textual app to display a toast.
-    Unlike notify_if_update_available(), this does NOT check TTY or
-    write to stderr — it just returns the message.
-    """
     if os.environ.get("AFM_NO_UPDATE_CHECK", "").strip() == "1":
         logger.debug("Update notification disabled via AFM_NO_UPDATE_CHECK")
         return None
@@ -184,14 +210,15 @@ def get_update_notification() -> str | None:
         except Exception:
             return None
 
-        state.data["notified_version"] = latest
-        state.save()
-
         upgrade_cmd = _detect_upgrade_command()
-        msg = (
-            f"Update available: {current} \u2192 {latest}. "
-            f"Run '{upgrade_cmd}' to update."
-        )
+        if upgrade_cmd is None:
+            # Docker / container: no package-manager command to suggest
+            msg = f"Update available: {current} \u2192 {latest}."
+        else:
+            msg = (
+                f"Update available: {current} \u2192 {latest}. "
+                f"Run '{upgrade_cmd}' to update."
+            )
         logger.debug("Returning toast notification: %s", msg)
         return msg
     except Exception as exc:
@@ -200,11 +227,7 @@ def get_update_notification() -> str | None:
 
 
 def notify_if_update_available() -> None:
-    """Show a notification if a newer version is available.
-
-    Only displays in interactive terminals (TTY). Tracks which version
-    was last notified to avoid showing the same message repeatedly.
-    """
+    """Show a notification if a newer version is available."""
     # Opt-out via environment variable
     if os.environ.get("AFM_NO_UPDATE_CHECK", "").strip() == "1":
         logger.debug("Update notification disabled via AFM_NO_UPDATE_CHECK")
@@ -240,11 +263,6 @@ def notify_if_update_available() -> None:
         except Exception:
             return
 
-        # Don't re-notify for the same version
-        if state.data.get("notified_version") == latest:
-            logger.debug("Already notified for version %s, skipping", latest)
-            return
-
         # Print notification to stderr using Rich
         from rich.console import Console
 
@@ -255,28 +273,26 @@ def notify_if_update_available() -> None:
             f"\n[yellow bold]A new version of afm is available: "
             f"{current} → {latest}[/]",
         )
-        console.print(
-            f"[yellow]Run '[bold]{upgrade_cmd}[/bold]' to update.[/]\n",
-        )
+        if upgrade_cmd is not None:
+            console.print(
+                f"[yellow]Run '[bold]{upgrade_cmd}[/bold]' to update.[/]\n",
+            )
+        else:
+            console.print(
+                "[yellow]Update your container image to get the latest version.[/]\n",
+            )
 
-        # Record that we notified about this version
-        state.data["notified_version"] = latest
-        state.save()
     except Exception:
         pass  # Never let notification logic break the CLI
 
 
 def _perform_background_check() -> None:
-    """Query PyPI for the latest version and write it to the state file.
-
-    This function is called by the background subprocess (python -m afm.update).
-    All exceptions are silently swallowed — background tasks must never
-    produce visible output or errors.
-    """
+    """Query PyPI for the latest version and write it to the state file."""
     try:
         import httpx
 
-        url = f"https://pypi.org/pypi/{PYPI_PACKAGE}/json"
+        package = _detect_package()
+        url = f"https://pypi.org/pypi/{package}/json"
         logger.debug("Querying PyPI: %s", url)
         response = httpx.get(
             url,

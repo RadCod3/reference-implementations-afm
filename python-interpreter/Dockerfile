@@ -39,6 +39,10 @@ COPY --from=builder /app/.venv /app/.venv
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
+# Signal to the AFM update checker that it's running inside a container.
+# This suppresses package-manager upgrade commands in update notifications
+# since users should update by rebuilding or pulling the container image.
+ENV AFM_RUNTIME=docker
 
 # Expose default port for web interfaces
 EXPOSE 8000
