@@ -80,7 +80,7 @@ jobs:
           TAG: ${{ steps.version.outputs.TAG }}
         run: |
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "::error::Tag $TAG already exists. Use re-release workflow to overwrite."
+            echo "::error::Tag $TAG already exists. Delete the existing tag and release branch before re-running, or bump the version in pyproject.toml."
             exit 1
           fi
 
@@ -92,7 +92,7 @@ jobs:
         run: |
           RELEASE_BRANCH="release-$PACKAGE-$VERSION"
           if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
-            echo "::error::Release branch $RELEASE_BRANCH already exists. Use re-release workflow to overwrite."
+            echo "::error::Release branch $RELEASE_BRANCH already exists. Delete the existing tag and release branch before re-running, or bump the version in pyproject.toml."
             exit 1
           fi
 
@@ -197,6 +197,7 @@ jobs:
     with:
       tag: ${{ needs.validate.outputs.tag }}
       implementation: python-interpreter
+      package: ${{ inputs.package }}
       version: ${{ needs.validate.outputs.release_version }}
       branch: ${{ inputs.branch }}
       is_rerelease: false
