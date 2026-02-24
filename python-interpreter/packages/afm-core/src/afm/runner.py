@@ -25,6 +25,7 @@ from .models import AFMRecord, Signature
 logger = logging.getLogger(__name__)
 
 ENTRY_POINT_GROUP = "afm.runner"
+DEFAULT_RUNNER = "langchain"
 
 
 @runtime_checkable
@@ -73,10 +74,11 @@ def discover_runners() -> dict[str, importlib.metadata.EntryPoint]:
 
 
 def load_runner(name: str | None = None) -> type[AgentRunner]:
-    """Load a specific runner by name, or the first available one.
+    """Load a specific runner by name, or the default/first available one.
 
     Args:
-        name: The name of the runner entry point. If None, the first
+        name: The name of the runner entry point. If None, the default
+              runner (langchain) is used if available, otherwise the first
               available runner is returned.
 
     Returns:
@@ -87,7 +89,7 @@ def load_runner(name: str | None = None) -> type[AgentRunner]:
     """
     runners = discover_runners()
 
-    if not runners:
+    if len(runners) == 0:
         from afm.update import _detect_install_command
 
         install_cmd = _detect_install_command("afm-langchain")
@@ -108,8 +110,8 @@ def load_runner(name: str | None = None) -> type[AgentRunner]:
             )
         ep = runners[name]
     else:
-        # Use the first available runner
-        ep = next(iter(runners.values()))
+        # Prefer the default runner, fall back to the first available
+        ep = runners.get(DEFAULT_RUNNER) or next(iter(runners.values()))
 
     runner_cls = ep.load()
     logger.info(f"Loaded runner: {ep.name} ({ep.value})")
