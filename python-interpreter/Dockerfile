@@ -28,7 +28,22 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-editable --package afm-core --package afm-langchain
 
 # Stage 2: Final image
+# VARIANT=full installs Node.js, npm (npx), git, and uv/uvx for MCP server support.
+# VARIANT=slim ships only Python + .venv.
 FROM python:3.13-alpine
+ARG VARIANT=full
+
+RUN if [ "$VARIANT" = "full" ]; then \
+        apk add --no-cache nodejs npm git && \
+        echo "Full variant: nodejs, npm, git installed"; \
+    fi
+
+# Install uv and uvx for Python-based MCP server support (full variant only)
+COPY --from=ghcr.io/astral-sh/uv:0.10.0 /uv /uvx /uv-bins/
+RUN if [ "$VARIANT" = "full" ]; then \
+        mv /uv-bins/uv /uv-bins/uvx /bin/; \
+    fi && \
+    rm -rf /uv-bins
 
 # Set working directory
 WORKDIR /app
