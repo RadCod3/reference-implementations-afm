@@ -130,6 +130,7 @@ jobs:
     with:
       tag: ${{ needs.validate.outputs.tag }}
       implementation: ballerina-interpreter
+      package: ballerina-interpreter
       version: ${{ needs.validate.outputs.release_version }}
       branch: ${{ inputs.branch }}
       is_rerelease: false

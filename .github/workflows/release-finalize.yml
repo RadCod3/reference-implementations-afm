@@ -19,6 +19,10 @@ on:
         description: 'Branch to release from'
         required: true
         type: string
+      package:
+        description: 'Package name (e.g., afm-core, afm-langchain, ballerina-interpreter)'
+        required: true
+        type: string
       is_rerelease:
         description: 'Whether this is a re-release'
         required: false
@@ -41,24 +45,26 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
           IMPLEMENTATION: ${{ inputs.implementation }}
+          PACKAGE: ${{ inputs.package }}
           VERSION: ${{ inputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "release-${TAG%-v*}-$VERSION"
+          git checkout -b "release-$PACKAGE-$VERSION"
           git tag "$TAG"
-          git push origin "release-${TAG%-v*}-$VERSION"
+          git push origin "release-$PACKAGE-$VERSION"
           git push origin "$TAG"
 
       - name: Generate release notes
         env:
           TAG: ${{ inputs.tag }}
           IMPLEMENTATION: ${{ inputs.implementation }}
+          PACKAGE: ${{ inputs.package }}
           VERSION: ${{ inputs.version }}
           IS_RERELEASE: ${{ inputs.is_rerelease }}
         run: |
           # Find previous tag for this implementation (exclude current version)
-          PREV_TAG=$(git tag -l "${TAG%-v*}-v*" --sort=-v:refname | grep -v "^$TAG$" | head -1)
+          PREV_TAG=$(git tag -l "$PACKAGE-v*" --sort=-v:refname | grep -v "^$TAG$" | head -1)
 
           # Generate notes from commits that touched this implementation
           if [ -n "$PREV_TAG" ]; then
@@ -108,9 +114,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
+          PACKAGE: ${{ inputs.package }}
           VERSION: ${{ inputs.version }}
         run: |
-          TITLE="${TAG%-v*} v$VERSION"
+          TITLE="$PACKAGE v$VERSION"
           gh release create "$TAG" \
             --title "$TITLE" \
             --notes-file release_notes.md
