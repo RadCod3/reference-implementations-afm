@@ -73,12 +73,13 @@ jobs:
           OWNER_LOWER=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
           echo "image_name=ghcr.io/$OWNER_LOWER/afm-langchain-interpreter" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
+      - name: Build and push full image
         uses: docker/build-push-action@v5
         with:
           context: python-interpreter
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: VARIANT=full
           tags: |
             ${{ steps.meta.outputs.image_name }}:latest
             ${{ steps.meta.outputs.image_name }}:${{ github.sha }}
@@ -86,6 +87,25 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=AFM LangChain Interpreter
+            org.opencontainers.image.licenses=Apache-2.0
+          annotations: |
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Build and push slim image
+        uses: docker/build-push-action@v5
+        with:
+          context: python-interpreter
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: VARIANT=slim
+          tags: |
+            ${{ steps.meta.outputs.image_name }}:slim
+            ${{ steps.meta.outputs.image_name }}:${{ github.sha }}-slim
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=AFM LangChain Interpreter (Slim)
             org.opencontainers.image.licenses=Apache-2.0
           annotations: |
             index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
