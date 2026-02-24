@@ -57,25 +57,46 @@ jobs:
           # GHCR requires lowercase repository names
           OWNER_LOWER=$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')
           FULL_IMAGE="ghcr.io/$OWNER_LOWER/$IMAGE_NAME"
-          TAGS="$FULL_IMAGE:v$VERSION"
-          if [ "$UPDATE_LATEST" = "true" ]; then
-            TAGS="$TAGS,$FULL_IMAGE:latest"
-          fi
-          echo "TAGS=$TAGS" >> $GITHUB_OUTPUT
+          TAGS_FULL="$FULL_IMAGE:v$VERSION"
+          [ "$UPDATE_LATEST" = "true" ] && TAGS_FULL="$TAGS_FULL,$FULL_IMAGE:latest"
+          echo "TAGS_FULL=$TAGS_FULL" >> $GITHUB_OUTPUT
+
+          TAGS_SLIM="$FULL_IMAGE:v$VERSION-slim"
+          [ "$UPDATE_LATEST" = "true" ] && TAGS_SLIM="$TAGS_SLIM,$FULL_IMAGE:slim"
+          echo "TAGS_SLIM=$TAGS_SLIM" >> $GITHUB_OUTPUT
           echo "FULL_IMAGE=$FULL_IMAGE" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
+      - name: Build and push full image
         uses: docker/build-push-action@v5
         with:
           context: ${{ inputs.context }}
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.docker-tags.outputs.TAGS }}
+          build-args: VARIANT=full
+          tags: ${{ steps.docker-tags.outputs.TAGS_FULL }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ inputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=${{ inputs.image_title }}
+            org.opencontainers.image.licenses=Apache-2.0
+          annotations: |
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Build and push slim image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ inputs.context }}
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: VARIANT=slim
+          tags: ${{ steps.docker-tags.outputs.TAGS_SLIM }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=${{ inputs.image_title }} (Slim)
             org.opencontainers.image.licenses=Apache-2.0
           annotations: |
             index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
