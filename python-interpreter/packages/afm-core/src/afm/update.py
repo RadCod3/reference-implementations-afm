@@ -153,17 +153,32 @@ class UpdateState:
         return (time.time() - last) >= CHECK_INTERVAL
 
 
+def _get_package_manager() -> str:
+    """Determine the package manager used to install the CLI."""
+    executable = sys.executable
+    if not executable:
+        return "pip"
+
+    parts = Path(executable).parts
+
+    if "pipx" in parts:
+        return "pipx"
+    elif "uv" in parts:
+        return "uv"
+    return "pip"
+
+
 def _detect_install_command(package: str = "afm-langchain") -> str | None:
     """Return the appropriate install command for a new plugin package."""
     if _is_docker():
         return None
 
     host_pkg = _detect_package()  # "afm-cli" or "afm-core"
-    executable = sys.executable or ""
+    manager = _get_package_manager()
 
-    if "pipx" in executable:
+    if manager == "pipx":
         return f"pipx inject {host_pkg} {package}"
-    elif "uv" in executable:
+    elif manager == "uv":
         return f"uv tool install --with {package} {host_pkg}"
     else:
         return f"pip install {package}"
@@ -177,11 +192,11 @@ def _detect_upgrade_command(package: str | None = None) -> str | None:
     if package is None:
         package = _detect_package()
 
-    executable = sys.executable or ""
+    manager = _get_package_manager()
 
-    if "pipx" in executable:
+    if manager == "pipx":
         return f"pipx upgrade {package}"
-    elif "uv" in executable:
+    elif manager == "uv":
         return f"uv tool upgrade {package}"
     else:
         return f"pip install -U {package}"

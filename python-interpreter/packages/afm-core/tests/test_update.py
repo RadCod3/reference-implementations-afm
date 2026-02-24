@@ -34,6 +34,7 @@ from afm.update import (
     _detect_package,
     _detect_upgrade_command,
     _get_installed_version,
+    _get_package_manager,
     _is_docker,
     _perform_background_check,
     get_update_notification,
@@ -406,6 +407,63 @@ class TestNotifyIfUpdateAvailable:
                 ):
                     notify_if_update_available()
             assert "0.2.0" in buf.getvalue()
+
+
+class TestGetPackageManager:
+    """Tests for _get_package_manager — the Path.parts-based detection helper."""
+
+    def test_detects_pipx_exact_dir(self):
+        """Should return 'pipx' when 'pipx' is an exact path component."""
+        with patch("afm.update.sys") as mock_sys:
+            mock_sys.executable = (
+                "/home/user/.local/share/pipx/venvs/afm-cli/bin/python"
+            )
+            assert _get_package_manager() == "pipx"
+
+    def test_detects_uv_exact_dir(self):
+        """Should return 'uv' when 'uv' is an exact path component."""
+        with patch("afm.update.sys") as mock_sys:
+            mock_sys.executable = "/home/user/.local/share/uv/tools/afm-cli/bin/python"
+            assert _get_package_manager() == "uv"
+
+    def test_fallback_to_pip(self):
+        """Should return 'pip' for a plain Python path with no pipx/uv component."""
+        with patch("afm.update.sys") as mock_sys:
+            mock_sys.executable = "/usr/bin/python3"
+            assert _get_package_manager() == "pip"
+
+    def test_no_false_positive_pipx_in_username(self):
+        """Should NOT match when 'pipx' appears only as a substring of a dir name."""
+        with patch("afm.update.sys") as mock_sys:
+            mock_sys.executable = "/home/pipx_user/python3/bin/python"
+            # 'pipx_user' is not an exact match for 'pipx'
+            assert _get_package_manager() == "pip"
+
+    def test_no_false_positive_uv_in_dir_name(self):
+        """Should NOT match when 'uv' appears only as a substring of a dir name."""
+        with patch("afm.update.sys") as mock_sys:
+            mock_sys.executable = "/opt/uv-tools/bin/python"
+            # 'uv-tools' is not an exact match for 'uv'
+            assert _get_package_manager() == "pip"
+
+    def test_empty_executable_returns_pip(self):
+        """Should return 'pip' when sys.executable is empty."""
+        with patch("afm.update.sys") as mock_sys:
+            mock_sys.executable = ""
+            assert _get_package_manager() == "pip"
+
+    def test_none_executable_returns_pip(self):
+        """Should return 'pip' when sys.executable is None."""
+        with patch("afm.update.sys") as mock_sys:
+            mock_sys.executable = None
+            assert _get_package_manager() == "pip"
+
+    def test_pipx_takes_precedence_over_uv_in_path(self):
+        """Should return 'pipx' when both 'pipx' and 'uv' appear as path components."""
+        with patch("afm.update.sys") as mock_sys:
+            # Contrived path where both appear; pipx is checked first
+            mock_sys.executable = "/home/user/.local/share/pipx/uv/bin/python"
+            assert _get_package_manager() == "pipx"
 
 
 class TestDetectUpgradeCommand:
