@@ -34,7 +34,7 @@ FROM python:3.13-alpine
 ARG VARIANT=full
 
 RUN if [ "$VARIANT" = "full" ]; then \
-        apk add --no-cache nodejs npm git && \
+        apk add --no-cache nodejs npm git; \
     fi
 
 # Install uv and uvx for Python-based MCP server support (full variant only)
