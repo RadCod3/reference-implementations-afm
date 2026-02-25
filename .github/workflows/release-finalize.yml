@@ -1,0 +1,123 @@
+name: Release Finalize
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Git tag to create (e.g., afm-core-v0.1.0 or ballerina-interpreter-v0.1.0)'
+        required: true
+        type: string
+      implementation:
+        description: 'Implementation directory name'
+        required: true
+        type: string
+      version:
+        description: 'Version being released (e.g., 0.1.0)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to release from'
+        required: true
+        type: string
+      package:
+        description: 'Package name (e.g., afm-core, afm-langchain, ballerina-interpreter)'
+        required: true
+        type: string
+      is_rerelease:
+        description: 'Whether this is a re-release'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+
+      - name: Create release branch, tag, and push
+        env:
+          TAG: ${{ inputs.tag }}
+          IMPLEMENTATION: ${{ inputs.implementation }}
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "release-$PACKAGE-$VERSION"
+          git tag "$TAG"
+          git push origin "release-$PACKAGE-$VERSION"
+          git push origin "$TAG"
+
+      - name: Generate release notes
+        env:
+          TAG: ${{ inputs.tag }}
+          IMPLEMENTATION: ${{ inputs.implementation }}
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
+          IS_RERELEASE: ${{ inputs.is_rerelease }}
+        run: |
+          # Find previous tag for this implementation (exclude current version)
+          PREV_TAG=$(git tag -l "$PACKAGE-v*" --sort=-v:refname | grep -v "^$TAG$" | head -1)
+
+          # Generate notes from commits that touched this implementation
+          if [ -n "$PREV_TAG" ]; then
+            echo "Generating notes since $PREV_TAG"
+            COMMITS=$(git log "$PREV_TAG..HEAD" --oneline -- "$IMPLEMENTATION/" | head -50)
+          else
+            echo "No previous tag found, using recent commits"
+            COMMITS=$(git log --oneline -50 -- "$IMPLEMENTATION/")
+          fi
+
+          # Write release notes using heredoc
+          if [ -n "$COMMITS" ]; then
+            if [ "$IS_RERELEASE" = "true" ]; then
+              cat <<-EOF > release_notes.md
+          ## Changes in $IMPLEMENTATION
+
+          $COMMITS
+
+          _Re-released version_
+          EOF
+            else
+              cat <<-EOF > release_notes.md
+          ## Changes in $IMPLEMENTATION
+
+          $COMMITS
+          EOF
+            fi
+          else
+            if [ "$IS_RERELEASE" = "true" ]; then
+              cat <<-EOF > release_notes.md
+          ## Changes in $IMPLEMENTATION
+
+          No changes detected in this implementation directory.
+
+          _Re-released version_
+          EOF
+            else
+              cat <<-EOF > release_notes.md
+          ## Changes in $IMPLEMENTATION
+
+          No changes detected in this implementation directory.
+          EOF
+            fi
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          TITLE="$PACKAGE v$VERSION"
+          gh release create "$TAG" \
+            --title "$TITLE" \
+            --notes-file release_notes.md

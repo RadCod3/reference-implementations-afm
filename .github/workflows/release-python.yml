@@ -1,0 +1,254 @@
+name: Release Python
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Python package to release'
+        required: true
+        type: choice
+        options:
+          - afm-core
+          - afm-langchain
+      branch:
+        description: 'Branch to release from'
+        required: false
+        default: 'main'
+        type: string
+
+concurrency:
+  group: release-python-interpreter
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_version: ${{ steps.version.outputs.RELEASE_VERSION }}
+      next_version: ${{ steps.version.outputs.NEXT_VERSION }}
+      tag: ${{ steps.version.outputs.TAG }}
+    steps:
+      - name: Validate branch format
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          if [[ ! "$BRANCH" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+            echo "::error::Invalid branch name: $BRANCH"
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+
+      - name: Read and validate version
+        id: version
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          VERSION_FILE="python-interpreter/packages/$PACKAGE/pyproject.toml"
+
+          if [ ! -f "$VERSION_FILE" ]; then
+            echo "::error::Version file not found: $VERSION_FILE"
+            exit 1
+          fi
+
+          RELEASE_VERSION=$(grep '^version = ' "$VERSION_FILE" | head -1 | sed 's/version = "\(.*\)"/\1/')
+
+          if [[ ! "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version in $VERSION_FILE must be in format X.Y.Z, got: $RELEASE_VERSION"
+            exit 1
+          fi
+
+          MAJOR=$(echo "$RELEASE_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$RELEASE_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$RELEASE_VERSION" | cut -d. -f3)
+          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          TAG="$PACKAGE-v$RELEASE_VERSION"
+
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+          echo "Releasing $PACKAGE $RELEASE_VERSION (tag: $TAG), next will be $NEXT_VERSION"
+
+      - name: Check tag doesn't already exist
+        env:
+          TAG: ${{ steps.version.outputs.TAG }}
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists. Delete the existing tag and release branch before re-running, or bump the version in pyproject.toml."
+            exit 1
+          fi
+
+      - name: Check release branch doesn't already exist
+        env:
+          TAG: ${{ steps.version.outputs.TAG }}
+          VERSION: ${{ steps.version.outputs.RELEASE_VERSION }}
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          RELEASE_BRANCH="release-$PACKAGE-$VERSION"
+          if git ls-remote --exit-code --heads origin "$RELEASE_BRANCH" >/dev/null 2>&1; then
+            echo "::error::Release branch $RELEASE_BRANCH already exists. Delete the existing tag and release branch before re-running, or bump the version in pyproject.toml."
+            exit 1
+          fi
+
+  test:
+    needs: validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-interpreter
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies and run tests
+        run: |
+          uv sync --dev
+          uv run pytest packages/afm-core/tests/ packages/afm-langchain/tests/
+
+  pypi-publish:
+    needs: [validate, test, docker]
+    if: >-
+          !cancelled()
+          && needs.validate.result == 'success'
+          && needs.test.result == 'success'
+          && (needs.docker.result == 'success'
+            || needs.docker.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build packages
+        working-directory: python-interpreter
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          if [ "$PACKAGE" = "afm-core" ]; then
+            uv build --package afm-core
+            uv build --package afm-cli
+          elif [ "$PACKAGE" = "afm-langchain" ]; then
+            uv build --package afm-langchain
+          fi
+
+      - name: Publish afm-core to PyPI
+        if: inputs.package == 'afm-core'
+        working-directory: python-interpreter
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.AFM_CORE_PYPI_API_TOKEN }}
+        run: uv publish dist/afm_core-*
+
+      - name: Publish afm-cli to PyPI
+        if: inputs.package == 'afm-core'
+        working-directory: python-interpreter
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.AFM_CLI_PYPI_API_TOKEN }}
+        run: uv publish dist/afm_cli-*
+
+      - name: Publish afm-langchain to PyPI
+        if: inputs.package == 'afm-langchain'
+        working-directory: python-interpreter
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.AFM_LANGCHAIN_PYPI_API_TOKEN }}
+        run: uv publish dist/afm_langchain-*
+
+  docker:
+    needs: [validate, test]
+    if: inputs.package == 'afm-langchain'
+    uses: ./.github/workflows/release-docker.yml
+    with:
+      context: python-interpreter
+      image_name: afm-langchain-interpreter
+      version: ${{ needs.validate.outputs.release_version }}
+      branch: ${{ inputs.branch }}
+      image_title: AFM LangChain Interpreter
+    permissions:
+      packages: write
+      security-events: write
+
+  finalize:
+    needs: [validate, pypi-publish, docker]
+    if: >-
+          !cancelled()
+          && needs.validate.result == 'success'
+          && needs.pypi-publish.result == 'success'
+          && (needs.docker.result == 'success'
+            || needs.docker.result == 'skipped')
+    uses: ./.github/workflows/release-finalize.yml
+    with:
+      tag: ${{ needs.validate.outputs.tag }}
+      implementation: python-interpreter
+      package: ${{ inputs.package }}
+      version: ${{ needs.validate.outputs.release_version }}
+      branch: ${{ inputs.branch }}
+      is_rerelease: false
+    permissions:
+      contents: write
+
+  bump-version:
+    needs: [validate, finalize]
+    if: >-
+          !cancelled()
+          && needs.validate.result == 'success'
+          && needs.finalize.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Bump version to next
+        env:
+          BRANCH: ${{ inputs.branch }}
+          PACKAGE: ${{ inputs.package }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull origin "$BRANCH" --rebase
+
+          cd python-interpreter
+          if [ "$PACKAGE" = "afm-core" ]; then
+            uv version --bump patch --package afm-core --frozen
+            uv version --bump patch --package afm-cli --frozen
+            # Sync the afm-core exact pin in afm-cli's dependencies
+            NEW_CORE_VERSION=$(uv version --short --package afm-core)
+            if [[ ! "$NEW_CORE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Failed to get valid afm-core version, got: '$NEW_CORE_VERSION'"
+              exit 1
+            fi
+            sed -i "s/\"afm-core==.*\"/\"afm-core==$NEW_CORE_VERSION\"/" packages/afm-cli/pyproject.toml
+          elif [ "$PACKAGE" = "afm-langchain" ]; then
+            uv version --bump patch --package afm-langchain --frozen
+          fi
+          cd ..
+
+          git add python-interpreter/packages/
+          git commit -m "Bump python-interpreter $PACKAGE versions to next patch"
+          git push origin "$BRANCH"
