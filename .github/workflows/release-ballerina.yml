@@ -139,6 +139,7 @@ jobs:
 
   bump-version:
     needs: [validate, finalize]
+    if: false  # Disabled: direct push blocked by branch protection
     runs-on: ubuntu-latest
     permissions:
       contents: write

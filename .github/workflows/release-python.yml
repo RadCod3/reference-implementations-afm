@@ -207,10 +207,7 @@ jobs:
 
   bump-version:
     needs: [validate, finalize]
-    if: >-
-      !cancelled()
-      && needs.validate.result == 'success'
-      && needs.finalize.result == 'success'
+    if: false  # Disabled: direct push blocked by branch protection
     runs-on: ubuntu-latest
     permissions:
       contents: write
