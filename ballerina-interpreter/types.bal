@@ -27,14 +27,24 @@ type Model record {|
 |};
 
 enum TransportType {
-    http
+    http,
+    stdio
 }
 
-type Transport record {|
+type HttpTransport record {|
     http 'type = http;
     string url;
     ClientAuthentication authentication?;
 |};
+
+type StdioTransport record {|
+    stdio 'type = stdio;
+    string command;
+    string[] args?;
+    map<string> env?;
+|};
+
+type Transport HttpTransport|StdioTransport;
 
 type ClientAuthentication record {
     string 'type;
