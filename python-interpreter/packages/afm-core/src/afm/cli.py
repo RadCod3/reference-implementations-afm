@@ -27,6 +27,7 @@ import click
 import uvicorn
 from fastapi import FastAPI
 
+from .constants import DEFAULT_HTTP_PORT
 from .exceptions import AFMError
 from .interfaces.base import get_http_path, get_interfaces
 from .interfaces.console_chat import async_run_console_chat
@@ -59,7 +60,7 @@ def create_unified_app(
     webhook_interface: WebhookInterface | None = None,
     startup_event: asyncio.Event | None = None,
     host: str = "0.0.0.0",
-    port: int = 8085,
+    port: int = DEFAULT_HTTP_PORT,
 ) -> FastAPI:
     if webchat_interface is None and webhook_interface is None:
         raise ValueError("At least one HTTP interface must be provided")
@@ -348,9 +349,9 @@ def validate(file: Path) -> None:
 @click.option(
     "--port",
     "-p",
-    default=8085,
+    default=DEFAULT_HTTP_PORT,
     type=int,
-    help="HTTP port for web interfaces (default: 8085)",
+    help=f"HTTP port for web interfaces (default: {DEFAULT_HTTP_PORT})",
 )
 @click.option(
     "--host",
