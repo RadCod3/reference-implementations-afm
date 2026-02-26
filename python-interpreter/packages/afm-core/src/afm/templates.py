@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any
 
 from .exceptions import (
@@ -103,7 +104,7 @@ def _parse_http_variable(http_part: str, full_expr: str) -> TemplateSegment:
 def evaluate_template(
     compiled: CompiledTemplate,
     payload: Any,
-    headers: dict[str, str | list[str]] | None,
+    headers: Mapping[str, str | list[str]] | None,
 ) -> str:
     parts: list[str] = []
 
@@ -144,7 +145,7 @@ def _handle_payload_variable(
 
 
 def _handle_header_variable(
-    headers: dict[str, str | list[str]] | None,
+    headers: Mapping[str, str | list[str]] | None,
     parts: list[str],
     segment: HeaderVariable,
 ) -> None:

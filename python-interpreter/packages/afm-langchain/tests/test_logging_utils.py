@@ -16,7 +16,6 @@
 
 import logging
 
-import pytest
 
 from afm_langchain.logging_utils import MCPStdioNoiseFilter
 
