@@ -472,6 +472,7 @@ def run(
     if webchat:
         webchat_path = get_http_path(webchat)
         click.echo(f"  - webchat at http://{host}:{port}{webchat_path}")
+        click.echo(f"  - webchat UI at http://{host}:{port}/chat/ui")
 
     if has_console:
         click.echo("  - consolechat (interactive)")
