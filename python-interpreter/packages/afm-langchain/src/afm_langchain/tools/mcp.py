@@ -19,10 +19,6 @@ from __future__ import annotations
 import logging
 
 import httpx
-from langchain_core.tools import BaseTool
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain_mcp_adapters.sessions import StreamableHttpConnection
-
 from afm.exceptions import (
     MCPAuthenticationError,
     MCPConnectionError,
@@ -31,9 +27,14 @@ from afm.exceptions import (
 from afm.models import (
     AFMRecord,
     ClientAuthentication,
+    HttpTransport,
     MCPServer,
+    StdioTransport,
     ToolFilter,
 )
+from langchain_core.tools import BaseTool
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.sessions import StdioConnection, StreamableHttpConnection
 
 logger = logging.getLogger(__name__)
 
@@ -125,14 +126,12 @@ class MCPClient:
     def __init__(
         self,
         name: str,
-        url: str,
-        authentication: ClientAuthentication | None = None,
+        transport: HttpTransport | StdioTransport,
         tool_filter: ToolFilter | None = None,
     ) -> None:
         """Initialize an MCP client."""
         self.name = name
-        self.url = url
-        self.authentication = authentication
+        self.transport = transport
         self.tool_filter = tool_filter
         self._tools: list[BaseTool] | None = None
 
@@ -140,31 +139,38 @@ class MCPClient:
     def from_mcp_server(cls, server: MCPServer) -> "MCPClient":
         transport = server.transport
 
-        if transport.type != "http":
+        if not isinstance(transport, (HttpTransport, StdioTransport)):
             raise MCPError(
-                f"Unsupported transport type: {transport.type}. Only 'http' is supported for now.",
+                f"Unsupported transport type: {transport.type}",
                 server_name=server.name,
             )
 
         return cls(
             name=server.name,
-            url=transport.url,
-            authentication=transport.authentication,
+            transport=transport,
             tool_filter=server.tool_filter,
         )
 
-    def _build_connection_config(self) -> StreamableHttpConnection:
-        config: StreamableHttpConnection = {
-            "transport": "streamable_http",
-            "url": self.url,
-        }
+    def _build_connection_config(self) -> StreamableHttpConnection | StdioConnection:
+        if isinstance(self.transport, HttpTransport):
+            config: StreamableHttpConnection = {
+                "transport": "streamable_http",
+                "url": self.transport.url,
+            }
+            auth = build_httpx_auth(self.transport.authentication)
+            if auth is not None:
+                config["auth"] = auth
+            return config
 
-        # Add authentication if configured
-        auth = build_httpx_auth(self.authentication)
-        if auth is not None:
-            config["auth"] = auth
-
-        return config
+        else:
+            config: StdioConnection = {
+                "transport": "stdio",
+                "command": self.transport.command,
+                "args": self.transport.args or [],
+            }
+            if self.transport.env is not None:
+                config["env"] = self.transport.env
+            return config
 
     async def get_tools(self) -> list[BaseTool]:
         try:

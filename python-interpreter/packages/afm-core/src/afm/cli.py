@@ -27,6 +27,7 @@ import click
 import uvicorn
 from fastapi import FastAPI
 
+from .constants import DEFAULT_HTTP_PORT
 from .exceptions import AFMError
 from .interfaces.base import get_http_path, get_interfaces
 from .interfaces.console_chat import async_run_console_chat
@@ -39,6 +40,7 @@ from .interfaces.webhook import (
 )
 from .models import (
     ConsoleChatInterface,
+    HttpTransport,
     WebChatInterface,
     WebhookInterface,
 )
@@ -58,7 +60,7 @@ def create_unified_app(
     webhook_interface: WebhookInterface | None = None,
     startup_event: asyncio.Event | None = None,
     host: str = "0.0.0.0",
-    port: int = 8000,
+    port: int = DEFAULT_HTTP_PORT,
 ) -> FastAPI:
     if webchat_interface is None and webhook_interface is None:
         raise ValueError("At least one HTTP interface must be provided")
@@ -232,7 +234,12 @@ def format_validation_output(afm: AFMRecord) -> str:
         lines.append("")
         lines.append("  MCP Servers:")
         for server in afm.metadata.tools.mcp:
-            lines.append(f"    - {server.name}: {server.transport.url}")
+            transport = server.transport
+            if isinstance(transport, HttpTransport):
+                transport_info = transport.url
+            else:
+                transport_info = transport.command
+            lines.append(f"    - {server.name}: {transport_info}")
             if server.tool_filter:
                 if server.tool_filter.allow:
                     lines.append(f"      Allow: {', '.join(server.tool_filter.allow)}")
@@ -342,9 +349,9 @@ def validate(file: Path) -> None:
 @click.option(
     "--port",
     "-p",
-    default=8000,
+    default=DEFAULT_HTTP_PORT,
     type=int,
-    help="HTTP port for web interfaces (default: 8000)",
+    help=f"HTTP port for web interfaces (default: {DEFAULT_HTTP_PORT})",
 )
 @click.option(
     "--host",
@@ -466,6 +473,7 @@ def run(
     if webchat:
         webchat_path = get_http_path(webchat)
         click.echo(f"  - webchat at http://{host}:{port}{webchat_path}")
+        click.echo(f"  - webchat UI at http://{host}:{port}/chat/ui")
 
     if has_console:
         click.echo("  - consolechat (interactive)")

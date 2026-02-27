@@ -21,10 +21,6 @@ import logging
 from types import TracebackType
 from typing import Any
 
-from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_core.tools import BaseTool
-
 from afm.exceptions import AgentError, InputValidationError, OutputValidationError
 from afm.models import (
     AFMRecord,
@@ -36,11 +32,17 @@ from afm.schema_validator import (
     coerce_output_to_schema,
     validate_input,
 )
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.tools import BaseTool
 
+from .logging_utils import MCPStdioNoiseFilter
 from .providers import create_model_provider
 from .tools.mcp import MCPManager
 
 logger = logging.getLogger(__name__)
+
+logging.getLogger("mcp.client.stdio").addFilter(MCPStdioNoiseFilter())
 
 
 class LangChainRunner:

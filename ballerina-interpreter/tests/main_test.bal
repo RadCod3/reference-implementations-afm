@@ -182,6 +182,75 @@ function testContainsHttpVariable() {
 }
 
 @test:Config
+function testValidateHttpVariablesInStdioTransportArgs() {
+    AFMRecord afmRecord = {
+        metadata: {
+            spec_version: "0.3.0",
+            tools: {
+                mcp: [
+                    {
+                        name: "test-server",
+                        transport: <StdioTransport>{
+                            'type: stdio,
+                            command: "some-command",
+                            args: ["${http:payload.field}", "--safe-arg", "${http:header.auth}"]
+                        }
+                    }
+                ]
+            }
+        },
+        role: "",
+        instructions: ""
+    };
+
+    error? result = validateHttpVariables(afmRecord);
+    if result is () {
+        test:assertFail("Expected error for http: variables in stdio transport args");
+    }
+    test:assertTrue(result.message().includes("tools.mcp.transport.args[0]"),
+            "Expected error to include 'tools.mcp.transport.args[0]'");
+    test:assertTrue(result.message().includes("tools.mcp.transport.args[2]"),
+            "Expected error to include 'tools.mcp.transport.args[2]'");
+    test:assertFalse(result.message().includes("tools.mcp.transport.args[1]"),
+            "Expected error NOT to include 'tools.mcp.transport.args[1]' (clean arg)");
+}
+
+@test:Config
+function testValidateHttpVariablesInStdioTransportEnv() {
+    AFMRecord afmRecord = {
+        metadata: {
+            spec_version: "0.3.0",
+            tools: {
+                mcp: [
+                    {
+                        name: "test-server",
+                        transport: <StdioTransport>{
+                            'type: stdio,
+                            command: "some-command",
+                            env: {
+                                "CLEAN_VAR": "safe-value",
+                                "SECRET_KEY": "${http:header.Authorization}"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        role: "",
+        instructions: ""
+    };
+
+    error? result = validateHttpVariables(afmRecord);
+    if result is () {
+        test:assertFail("Expected error for http: variables in stdio transport env");
+    }
+    test:assertTrue(result.message().includes("tools.mcp.transport.env.SECRET_KEY"),
+            "Expected error to include 'tools.mcp.transport.env.SECRET_KEY'");
+    test:assertFalse(result.message().includes("tools.mcp.transport.env.CLEAN_VAR"),
+            "Expected error NOT to include 'tools.mcp.transport.env.CLEAN_VAR' (clean env var)");
+}
+
+@test:Config
 function testParseAfmWithoutFrontmatter() {
     string content = string `# Role
 This is the role.

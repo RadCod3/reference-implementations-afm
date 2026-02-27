@@ -31,9 +31,8 @@ function createAgent(AFMRecord afmRecord) returns ai:Agent|error {
     if mcpServers is MCPServer[] {
         foreach MCPServer mcpConn in mcpServers {
             Transport transport = mcpConn.transport;
-            if transport.'type != "http" {
-                log:printWarn(string `Unsupported transport type: ${transport.'type}, only 'http' is supported`);
-                continue;
+            if transport is StdioTransport {
+                return error("Stdio transport is not yet supported by the Ballerina interpreter");
             }
 
             string[]? filteredTools = getFilteredTools(mcpConn.tool_filter);

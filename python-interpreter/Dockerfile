@@ -28,7 +28,28 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-editable --package afm-core --package afm-langchain
 
 # Stage 2: Final image
+# VARIANT=full installs Node.js, npm (npx), git, and uv/uvx for MCP server support.
+# VARIANT=slim ships only Python + .venv.
 FROM python:3.13-alpine
+ARG VARIANT=full
+
+# Validate VARIANT early so typos fail loudly instead of silently producing a slim build.
+RUN if [ "$VARIANT" != "full" ] && [ "$VARIANT" != "slim" ]; then \
+        echo "ERROR: VARIANT must be 'full' or 'slim', got: '$VARIANT'" >&2; \
+        exit 1; \
+    fi
+
+RUN if [ "$VARIANT" = "full" ]; then \
+        apk add --no-cache nodejs npm git; \
+    fi
+
+# Install uv and uvx for Python-based MCP server support (full variant only)
+# Use bind mounts so the uv binaries are never written into any image layer for slim builds.
+RUN --mount=type=bind,from=ghcr.io/astral-sh/uv:0.10.0,source=/uv,target=/tmp/uv \
+    --mount=type=bind,from=ghcr.io/astral-sh/uv:0.10.0,source=/uvx,target=/tmp/uvx \
+    if [ "$VARIANT" = "full" ]; then \
+        cp /tmp/uv /tmp/uvx /bin/; \
+    fi
 
 # Set working directory
 WORKDIR /app
@@ -45,7 +66,7 @@ ENV PYTHONUNBUFFERED=1
 ENV AFM_RUNTIME=docker
 
 # Expose default port for web interfaces
-EXPOSE 8000
+EXPOSE 8085
 
 # Entry point to run the afm CLI
 ENTRYPOINT ["afm"]

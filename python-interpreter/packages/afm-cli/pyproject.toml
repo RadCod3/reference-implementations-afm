@@ -1,6 +1,6 @@
 [project]
 name = "afm-cli"
-version = "0.2.10"
+version = "0.3.0"
 description = "AFM CLI metapackage: installs afm-core and afm-langchain"
 readme = "README.md"
 classifiers = [
@@ -11,8 +11,8 @@ license = "Apache-2.0"
 requires-python = ">=3.11"
 urls = { Repository = "https://github.com/wso2/reference-implementations-afm" }
 dependencies = [
-    "afm-core==0.1.7",
-    "afm-langchain>=0.1.0",
+    "afm-core==0.2.0",
+    "afm-langchain>=0.2.0",
 ]
 
 [project.scripts]

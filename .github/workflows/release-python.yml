@@ -4,17 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: 'Python package to release'
+        description: "Python package to release"
         required: true
         type: choice
         options:
           - afm-core
           - afm-langchain
       branch:
-        description: 'Branch to release from'
+        description: "Branch to release from"
         required: false
-        default: 'main'
+        default: "main"
         type: string
+      skip_pypi:
+        description: "Skip PyPI publishing"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: release-python-interpreter
@@ -121,11 +126,12 @@ jobs:
   pypi-publish:
     needs: [validate, test, docker]
     if: >-
-          !cancelled()
-          && needs.validate.result == 'success'
-          && needs.test.result == 'success'
-          && (needs.docker.result == 'success'
-            || needs.docker.result == 'skipped')
+      !cancelled()
+      && !inputs.skip_pypi
+      && needs.validate.result == 'success'
+      && needs.test.result == 'success'
+      && (needs.docker.result == 'success'
+        || needs.docker.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -181,6 +187,7 @@ jobs:
       version: ${{ needs.validate.outputs.release_version }}
       branch: ${{ inputs.branch }}
       image_title: AFM LangChain Interpreter
+      build_slim: true
     permissions:
       packages: write
       security-events: write
@@ -188,11 +195,12 @@ jobs:
   finalize:
     needs: [validate, pypi-publish, docker]
     if: >-
-          !cancelled()
-          && needs.validate.result == 'success'
-          && needs.pypi-publish.result == 'success'
-          && (needs.docker.result == 'success'
-            || needs.docker.result == 'skipped')
+      !cancelled()
+      && needs.validate.result == 'success'
+      && (needs.pypi-publish.result == 'success'
+        || (needs.pypi-publish.result == 'skipped' && inputs.skip_pypi))
+      && (needs.docker.result == 'success'
+        || needs.docker.result == 'skipped')
     uses: ./.github/workflows/release-finalize.yml
     with:
       tag: ${{ needs.validate.outputs.tag }}
@@ -206,10 +214,7 @@ jobs:
 
   bump-version:
     needs: [validate, finalize]
-    if: >-
-          !cancelled()
-          && needs.validate.result == 'success'
-          && needs.finalize.result == 'success'
+    if: false # Disabled: direct push blocked by branch protection
     runs-on: ubuntu-latest
     permissions:
       contents: write

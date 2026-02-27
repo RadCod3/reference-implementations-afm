@@ -246,12 +246,36 @@ function validateHttpVariables(AFMRecord afmRecord) returns error? {
                 }
 
                 Transport transport = server.transport;
-                if containsHttpVariable(transport.url) {
-                    erroredKeys.push("tools.mcp.transport.url");
-                }
+                if transport is HttpTransport {
+                    if containsHttpVariable(transport.url) {
+                        erroredKeys.push("tools.mcp.transport.url");
+                    }
 
-                if authenticationContainsHttpVariable(transport.authentication) {
-                    erroredKeys.push("tools.mcp.transport.authentication");
+                    if authenticationContainsHttpVariable(transport.authentication) {
+                        erroredKeys.push("tools.mcp.transport.authentication");
+                    }
+                } else {
+                    if containsHttpVariable(transport.command) {
+                        erroredKeys.push("tools.mcp.transport.command");
+                    }
+
+                    string[]? args = transport.args;
+                    if args is string[] {
+                        foreach int idx in 0 ..< args.length() {
+                            if containsHttpVariable(args[idx]) {
+                                erroredKeys.push(string `tools.mcp.transport.args[${idx}]`);
+                            }
+                        }
+                    }
+
+                    map<string>? env = transport.env;
+                    if env is map<string> {
+                        foreach [string, string] [k, val] in env.entries() {
+                            if containsHttpVariable(val) {
+                                erroredKeys.push("tools.mcp.transport.env." + k);
+                            }
+                        }
+                    }
                 }
 
                 if toolFilterContainsHttpVariable(server.tool_filter) {

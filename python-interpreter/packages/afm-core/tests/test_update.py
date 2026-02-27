@@ -590,6 +590,7 @@ class TestDetectInstallCommand:
             with patch("afm.update.sys") as mock_sys:
                 mock_sys.executable = "/usr/bin/python3"
                 cmd = _detect_install_command()
+        assert cmd is not None
         assert "afm-langchain" in cmd
 
 
