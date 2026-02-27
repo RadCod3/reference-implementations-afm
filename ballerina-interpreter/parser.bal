@@ -261,20 +261,18 @@ function validateHttpVariables(AFMRecord afmRecord) returns error? {
 
                     string[]? args = transport.args;
                     if args is string[] {
-                        foreach string arg in args {
-                            if containsHttpVariable(arg) {
-                                erroredKeys.push("tools.mcp.transport.args");
-                                break;
+                        foreach int idx in 0 ..< args.length() {
+                            if containsHttpVariable(args[idx]) {
+                                erroredKeys.push(string `tools.mcp.transport.args[${idx}]`);
                             }
                         }
                     }
 
                     map<string>? env = transport.env;
                     if env is map<string> {
-                        foreach string val in env {
+                        foreach [string, string] [k, val] in env.entries() {
                             if containsHttpVariable(val) {
-                                erroredKeys.push("tools.mcp.transport.env");
-                                break;
+                                erroredKeys.push("tools.mcp.transport.env." + k);
                             }
                         }
                     }
