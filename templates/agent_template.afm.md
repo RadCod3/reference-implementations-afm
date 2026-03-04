@@ -124,6 +124,8 @@ tools:
     # --------------------------------------------------------------------------
     # stdio Transport Examples
     # --------------------------------------------------------------------------
+    # NOTE: stdio transport is currently only supported in the LangChain-based
+    # interpreter for AFM
 
     # MCP Server via npx package
     - name: "filesystem_server"
