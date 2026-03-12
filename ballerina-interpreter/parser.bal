@@ -161,7 +161,7 @@ function validateHttpVariables(AFMRecord afmRecord) returns error? {
         return error("http: variables are only supported in webhook prompt fields, found in instructions section");
     }
 
-    AgentMetadata {authors, provider, model, interfaces, tools, max_iterations: _, ...rest} = afmRecord.metadata;
+    AgentMetadata {authors, provider, model, interfaces, tools, skills, max_iterations: _, ...rest} = afmRecord.metadata;
 
     string[] erroredKeys = [];
 
@@ -281,6 +281,14 @@ function validateHttpVariables(AFMRecord afmRecord) returns error? {
                 if toolFilterContainsHttpVariable(server.tool_filter) {
                     erroredKeys.push("tools.mcp.filter");
                 }
+            }
+        }
+    }
+
+    if skills is SkillSource[] {
+        foreach SkillSource skillSource in skills {
+            if containsHttpVariable(skillSource.path) {
+                erroredKeys.push("skills.path");
             }
         }
     }
