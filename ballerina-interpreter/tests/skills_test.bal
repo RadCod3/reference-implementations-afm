@@ -574,10 +574,6 @@ function testSkillsToolKitGetTools() returns error? {
 
     // Should return 2 tools: activate_skill and read_skill_resource
     test:assertEquals(tools.length(), 2);
-
-    // Verify both tools are present by checking the function references
-    // The tools array contains ToolConfig records with the function metadata
-    test:assertTrue(tools.length() == 2, "Should have exactly 2 tools");
 }
 
 // ============================================

@@ -44,9 +44,17 @@ type SkillFrontmatter record {
 
 function discoverSkills(SkillSource[] sources, string afmFileDir) returns map<SkillInfo>|error {
     map<SkillInfo> skills = {};
+    string normalizedAfmDir = check file:normalizePath(check file:getAbsolutePath(afmFileDir), file:CLEAN);
 
     foreach SkillSource 'source in sources {
+        if check file:isAbsolutePath('source.path) {
+            return error(string `Skill source path must be relative, but got: ${'source.path}`);
+        }
         string resolvedPath = check file:joinPath(afmFileDir, 'source.path);
+        string normalizedPath = check file:normalizePath(check file:getAbsolutePath(resolvedPath), file:CLEAN);
+        if !normalizedPath.startsWith(normalizedAfmDir) {
+            return error(string `Skill source path '${'source.path}' resolves outside the AFM file directory`);
+        }
         map<SkillInfo> localSkills = check discoverLocalSkills(resolvedPath);
         foreach [string, SkillInfo] [name, info] in localSkills.entries() {
             if skills.hasKey(name) {
@@ -125,14 +133,17 @@ function listLocalResources(string basePath) returns string[] {
     foreach string dir in [REFERENCES_DIR, ASSETS_DIR] {
         do {
             string dirPath = check file:joinPath(basePath, dir);
+            if !check file:test(dirPath, file:EXISTS) {
+                continue;
+            }
             file:MetaData[] entries = check file:readDir(dirPath);
             foreach file:MetaData entry in entries {
                 if !entry.dir {
-                    resources.push(check file:joinPath(dir, check file:basename(entry.absPath)));
+                    resources.push(string `${dir}/${check file:basename(entry.absPath)}`);
                 }
             }
         } on fail error e {
-            log:printDebug(string `Failed to read directory ${dir}`, 'error = e);
+            log:printWarn(string `Failed to read directory ${dir}`, 'error = e);
         }
     }
     return resources;
