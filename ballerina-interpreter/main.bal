@@ -50,9 +50,9 @@ public function main(string? filePath = ()) returns error? {
 }
 
 function runAgentFromAFM(AFMRecord afm, int port, string afmFileDir) returns error? {
-    AgentMetadata metadata = afm.metadata;
+    AgentMetadata? metadata = afm?.metadata;
 
-    Interface[] agentInterfaces = metadata.interfaces ?: [<ConsoleChatInterface>{}];
+    Interface[] agentInterfaces = metadata?.interfaces ?: [<ConsoleChatInterface>{}];
 
     var [consoleChatInterface, webChatInterface, webhookInterface] = 
                         check validateAndExtractInterfaces(agentInterfaces);

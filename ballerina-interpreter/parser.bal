@@ -20,8 +20,15 @@ import ballerina/os;
 function parseAfm(string content) returns AFMRecord|error {
     string resolvedContent = check resolveVariables(content);
 
-    [map<json>, string] [frontmatterMap, body] = check extractFrontmatter(resolvedContent);
-    AgentMetadata metadata = check frontmatterMap.fromJsonWithType();
+    AgentMetadata? metadata = ();
+    string body;
+    if resolvedContent.startsWith(FRONTMATTER_DELIMITER) {
+        map<json> frontmatterMap;
+        [frontmatterMap, body] = check extractFrontmatter(resolvedContent);
+        metadata = check frontmatterMap.fromJsonWithType();
+    } else {
+        body = resolvedContent;
+    }
 
     // Extract Role and Instructions sections
     string[] bodyLines = splitLines(body);
@@ -140,7 +147,12 @@ function validateHttpVariables(AFMRecord afmRecord) returns error? {
         return error("http: variables are only supported in webhook prompt fields, found in instructions section");
     }
 
-    AgentMetadata {authors, provider, model, interfaces, tools, skills, max_iterations: _, ...rest} = afmRecord.metadata;
+    AgentMetadata? metadata = afmRecord?.metadata;
+    if metadata is () {
+        return;
+    }
+
+    AgentMetadata {authors, provider, model, interfaces, tools, skills, max_iterations: _, ...rest} = metadata;
 
     string[] erroredKeys = [];
 

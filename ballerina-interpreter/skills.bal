@@ -23,7 +23,7 @@ const SKILL_FILE = "SKILL.md";
 const REFERENCES_DIR = "references";
 const ASSETS_DIR = "assets";
 
-function extractSkillCatalog(AgentMetadata metadata, string afmFileDir) returns [string, SkillsToolKit]|error? {
+function extractSkillCatalog(AgentMetadata? metadata, string afmFileDir) returns [string, SkillsToolKit]|error? {
     SkillSource[]? skillSources = metadata?.skills;
     if skillSources is () || skillSources.length() == 0 {
         return ();

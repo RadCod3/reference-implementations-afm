@@ -174,7 +174,7 @@ type AgentMetadata record {|
 |};
 
 type AFMRecord record {|
-    AgentMetadata metadata;
+    AgentMetadata metadata?;
     string role;
     string instructions;
 |};
