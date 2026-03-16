@@ -24,7 +24,7 @@ function parseAfm(string content) returns AFMRecord|error {
     string body;
     if resolvedContent.startsWith(FRONTMATTER_DELIMITER) {
         map<json> frontmatterMap;
-        [frontmatterMap, body] = check extractFrontmatter(resolvedContent);
+        [frontmatterMap, body] = check extractFrontMatter(resolvedContent);
         metadata = check frontmatterMap.fromJsonWithType();
     } else {
         body = resolvedContent;
@@ -37,8 +37,7 @@ function parseAfm(string content) returns AFMRecord|error {
     boolean inRole = false;
     boolean inInstructions = false;
 
-    foreach int k in 0 ..< bodyLines.length() {
-        string line = bodyLines[k];
+    foreach string line in bodyLines {
         string trimmed = line.trim();
         
         if trimmed.startsWith("# ") {
@@ -399,7 +398,7 @@ function toolFilterContainsHttpVariable(ToolFilter? filter) returns boolean {
 
 // Extracts YAML frontmatter and the remaining body from a document delimited by `---`.
 // Returns the parsed YAML as a map and the body text after the closing delimiter.
-function extractFrontmatter(string content) returns [map<json>, string]|error {
+function extractFrontMatter(string content) returns [map<json>, string]|error {
     string[] lines = splitLines(content);
     int length = lines.length();
 

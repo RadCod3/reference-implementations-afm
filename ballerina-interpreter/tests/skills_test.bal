@@ -178,7 +178,7 @@ function testActivateSkillFound() returns error? {
         }
     };
     SkillsToolKit toolkit = new (skills);
-    string result = check toolkit.activate_skill("doc-gen");
+    string result = check toolkit.activateSkill("doc-gen");
     test:assertTrue(result.includes("Scan exported symbols and produce Markdown API docs."));
     test:assertTrue(result.includes("doc-gen"));
 }
@@ -195,12 +195,12 @@ function testActivateSkillFoundWithResources() returns error? {
         }
     };
     SkillsToolKit toolkit = new (skills);
-    string result = check toolkit.activate_skill("perf-profile");
+    string result = check toolkit.activateSkill("perf-profile");
     test:assertTrue(result.includes("Instrument the critical path and collect flame-graph data."));
     test:assertTrue(result.includes("skill_resources"));
     test:assertTrue(result.includes("references/guide.md"));
     test:assertTrue(result.includes("assets/schema.json"));
-    test:assertTrue(result.includes("read_skill_resource"));
+    test:assertTrue(result.includes("readSkillResource"));
 }
 
 @test:Config
@@ -215,7 +215,7 @@ function testActivateSkillNotFound() {
         }
     };
     SkillsToolKit toolkit = new (skills);
-    string|error result = toolkit.activate_skill("nonexistent");
+    string|error result = toolkit.activateSkill("nonexistent");
     if result is string {
         test:assertFail("Expected error for nonexistent skill");
     }
@@ -227,7 +227,7 @@ function testActivateSkillNotFound() {
 function testReadSkillResourceInvalidSkillName() {
     map<SkillInfo> skills = {};
     SkillsToolKit toolkit = new (skills);
-    string|error result = toolkit.read_skill_resource("unknown", "references/file.md");
+    string|error result = toolkit.readSkillResource("unknown", "references/file.md");
     if result is string {
         test:assertFail("Expected error for unknown skill");
     }
@@ -246,7 +246,7 @@ function testReadSkillResourceInvalidPathPrefix() {
         }
     };
     SkillsToolKit toolkit = new (skills);
-    string|error result = toolkit.read_skill_resource("env-check", "other/file.txt");
+    string|error result = toolkit.readSkillResource("env-check", "other/file.txt");
     if result is string {
         test:assertFail("Expected error for invalid path prefix");
     }
@@ -265,7 +265,7 @@ function testReadSkillResourcePathTraversal() {
         }
     };
     SkillsToolKit toolkit = new (skills);
-    string|error result = toolkit.read_skill_resource("env-check", "references/../../../etc/passwd");
+    string|error result = toolkit.readSkillResource("env-check", "references/../../../etc/passwd");
     if result is string {
         test:assertFail("Expected error for path traversal");
     }
@@ -284,7 +284,7 @@ function testReadSkillResourceNotListed() {
         }
     };
     SkillsToolKit toolkit = new (skills);
-    string|error result = toolkit.read_skill_resource("env-check", "references/other.md");
+    string|error result = toolkit.readSkillResource("env-check", "references/other.md");
     if result is string {
         test:assertFail("Expected error for unlisted resource");
     }
@@ -424,30 +424,30 @@ function testProgressiveDisclosureEndToEnd() returns error? {
 
     // Step 3: Activate skill — body is now revealed
     SkillsToolKit toolkit = new (skills);
-    string activateResult = check toolkit.activate_skill("security-review");
+    string activateResult = check toolkit.activateSkill("security-review");
 
     // Activation MUST include the full body
     test:assertTrue(activateResult.includes("Perform a security-focused code review"),
-            "activate_skill must return the skill body");
+            "activateSkill must return the skill body");
 
     // Activation MUST list available resources
     test:assertTrue(activateResult.includes("skill_resources"),
-            "activate_skill must include skill_resources section");
+            "activateSkill must include skill_resources section");
     test:assertTrue(activateResult.includes("references/REFERENCE.md"));
     test:assertTrue(activateResult.includes("assets/template.json"));
 
     // Step 4: Read a resource — file content is now revealed
-    string refContent = check toolkit.read_skill_resource("security-review", "references/REFERENCE.md");
+    string refContent = check toolkit.readSkillResource("security-review", "references/REFERENCE.md");
     test:assertTrue(refContent.includes("OWASP Top 10 Quick Reference"),
-            "read_skill_resource must return actual file content");
+            "readSkillResource must return actual file content");
     test:assertTrue(refContent.includes("reference file for security-review"));
 
-    string assetContent = check toolkit.read_skill_resource("security-review", "assets/template.json");
+    string assetContent = check toolkit.readSkillResource("security-review", "assets/template.json");
     test:assertTrue(assetContent.includes("security-review"),
-            "read_skill_resource must return asset file content");
+            "readSkillResource must return asset file content");
 
     // Step 5: Verify non-resource skill has no resources disclosed
-    string alphaResult = check toolkit.activate_skill("pr-summary");
+    string alphaResult = check toolkit.activateSkill("pr-summary");
     test:assertTrue(alphaResult.includes("Summarize each merged pull request"));
     test:assertFalse(alphaResult.includes("skill_resources"),
             "pr-summary has no resources, so no skill_resources section");
@@ -484,9 +484,9 @@ function testProgressiveDisclosureViaExtractSkillCatalog() returns error? {
             "Catalog must not contain security-review body");
 
     // Activating reveals the body
-    string body = check toolkit.activate_skill("test-gen");
+    string body = check toolkit.activateSkill("test-gen");
     test:assertTrue(body.includes("body of the test skill"),
-            "activate_skill must reveal the full body");
+            "activateSkill must reveal the full body");
 }
 
 // ============================================
@@ -572,7 +572,7 @@ function testSkillsToolKitGetTools() returns error? {
     SkillsToolKit toolkit = new (skills);
     var tools = toolkit.getTools();
 
-    // Should return 2 tools: activate_skill and read_skill_resource
+    // Should return 2 tools: activateSkill and readSkillResource
     test:assertEquals(tools.length(), 2);
 }
 

@@ -105,23 +105,25 @@ function discoverLocalSkills(string path) returns map<SkillInfo>|error {
 
 function parseSkillMd(string skillMdPath, string basePath) returns SkillInfo|error {
     string content = check io:fileReadString(skillMdPath);
-    return parseSkillMdContent(content, basePath, listLocalResources(basePath));
+    string[] resources = listLocalResources(basePath);
+    return parseSkillMdContent(content, basePath, resources);
 }
 
 function parseSkillMdContent(string content, string basePath, string[] resources) returns SkillInfo|error {
-    [map<json>, string] [frontmatterMap, body] = check extractFrontmatter(content);
-    SkillFrontmatter frontmatter = check frontmatterMap.fromJsonWithType();
+    [map<json>, string] [frontMatterMap, body] = check extractFrontMatter(content);
+    SkillFrontmatter {name, description} = check frontMatterMap.fromJsonWithType();
 
-    if frontmatter.name.trim() == "" {
+    if name.trim() == "" {
         return error("SKILL.md 'name' field is required and must not be empty");
     }
-    if frontmatter.description.trim() == "" {
+
+    if description.trim() == "" {
         return error("SKILL.md 'description' field is required and must not be empty");
     }
 
     return {
-        name: frontmatter.name,
-        description: frontmatter.description,
+        name,
+        description,
         body: body.trim(),
         basePath,
         resources
@@ -158,7 +160,7 @@ function buildSkillCatalog(map<SkillInfo> skills) returns string? {
 ## Available Skills
 
 The following skills provide specialized instructions for specific tasks.
-When a task matches a skill's description, call the activate_skill tool
+When a task matches a skill's description, call the activateSkill tool
 with the skill's name to load its full instructions.
 
 ${xml `<available_skills>
@@ -187,7 +189,7 @@ isolated class SkillsToolKit {
     # + name - the name of the skill to activate (must match a name from the available skills catalog)
     # + return - the skill's full instructions and list of available resource files
     @ai:AgentTool
-    isolated function activate_skill(string name) returns string|error {
+    isolated function activateSkill(string name) returns string|error {
         if !self.skills.hasKey(name) {
             return error(string `Skill '${name}' not found. Available skills: ${
                 string:'join(", ", ...self.skills.keys())}`);
@@ -201,7 +203,7 @@ isolated class SkillsToolKit {
 <skill_resources>
 ${string:'join("\n", ...from string res in info.resources select string `<file>${res}</file>`)}
 </skill_resources>
-Use the read_skill_resource tool to read any of these files if needed.
+Use the readSkillResource tool to read any of these files if needed.
 ` : "";
         return string `
 <skill_content name="${info.name}">
@@ -218,7 +220,7 @@ ${resourcesSection}
     # + resourcePath - relative path to the resource file (e.g., "references/REFERENCE.md" or "assets/template.json")
     # + return - the content of the resource file
     @ai:AgentTool
-    isolated function read_skill_resource(string skillName, string resourcePath) returns string|error {
+    isolated function readSkillResource(string skillName, string resourcePath) returns string|error {
         if !self.skills.hasKey(skillName) {
             return error(string `Skill '${skillName}' not found`);
         }
@@ -243,5 +245,5 @@ ${resourcesSection}
     }
 
     public isolated function getTools() returns ai:ToolConfig[] =>
-        ai:getToolConfigs([self.activate_skill, self.read_skill_resource]);
+        ai:getToolConfigs([self.activateSkill, self.readSkillResource]);
 }
