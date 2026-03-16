@@ -61,8 +61,18 @@ def discover_skills(
     """Discover skills from all sources, resolving paths relative to the AFM file directory."""
     skills: dict[str, SkillInfo] = {}
 
+    normalized_afm_dir = afm_file_dir.resolve()
+
     for source in sources:
+        if Path(source.path).is_absolute():
+            raise ValueError(
+                f"Skill source path must be relative, but got: {source.path}"
+            )
         resolved_path = (afm_file_dir / source.path).resolve()
+        if not str(resolved_path).startswith(str(normalized_afm_dir)):
+            raise ValueError(
+                f"Skill source path '{source.path}' resolves outside the AFM file directory"
+            )
         local_skills = discover_local_skills(resolved_path)
         for name, info in local_skills.items():
             if name in skills:

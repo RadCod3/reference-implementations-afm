@@ -202,6 +202,16 @@ class TestDiscoverSkills:
         skills = discover_skills([], FIXTURES_DIR)
         assert skills == {}
 
+    def test_absolute_path_raises(self) -> None:
+        sources = [LocalSkillSource(path="/absolute/path/to/skills")]
+        with pytest.raises(ValueError, match="must be relative"):
+            discover_skills(sources, FIXTURES_DIR)
+
+    def test_path_outside_afm_dir_raises(self) -> None:
+        sources = [LocalSkillSource(path="../../outside")]
+        with pytest.raises(ValueError, match="resolves outside"):
+            discover_skills(sources, FIXTURES_DIR)
+
 
 # ---------------------------------------------------------------------------
 # build_skill_catalog
