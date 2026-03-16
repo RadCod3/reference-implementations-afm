@@ -159,7 +159,7 @@ tools:
 # SKILLS - OPTIONAL (Agent Skills format: https://agentskills.io)
 # ============================================================================
 skills:
-  # Local skills directory or (a directory that may contain multiple skill subdirectories)
+  # Local skills directory (or a directory that may contain multiple skill subdirectories)
   - type: "local"
     path: "./skills"
 ---
