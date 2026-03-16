@@ -325,6 +325,44 @@ function testDiscoverLocalSkillsInvalidSkill() returns error? {
 }
 
 @test:Config
+function testDiscoverSkillsAbsolutePathRejected() returns error? {
+    string testDir = check file:getAbsolutePath("tests/skills");
+    SkillSource[] sources = [{path: "/absolute/path/to/skills"}];
+    map<SkillInfo>|error result = discoverSkills(sources, testDir);
+    if result is map<SkillInfo> {
+        test:assertFail("Expected error for absolute path");
+    }
+    test:assertTrue(result.message().includes("must be relative"));
+}
+
+@test:Config
+function testDiscoverSkillsPathOutsideAfmDirRejected() returns error? {
+    string testDir = check file:getAbsolutePath("tests/skills");
+    SkillSource[] sources = [{path: "../../outside"}];
+    map<SkillInfo>|error result = discoverSkills(sources, testDir);
+    if result is map<SkillInfo> {
+        test:assertFail("Expected error for path outside AFM directory");
+    }
+    test:assertTrue(result.message().includes("resolves outside"));
+}
+
+@test:Config
+function testDiscoverSkillsSiblingPrefixPathRejected() returns error? {
+    // A sibling directory sharing a name prefix must not pass validation.
+    // E.g. if afm_dir is '/a/skills', a path resolving to '/a/skills-evil'
+    // should be rejected even though it starts with the same string prefix.
+    string testDir = check file:getAbsolutePath("tests/skills/single_skill");
+    // "../single_skill_extra" would resolve to tests/skills/single_skill_extra
+    // which shares the prefix "tests/skills/single_skill" but is outside the dir
+    SkillSource[] sources = [{path: "../single_skill_extra"}];
+    map<SkillInfo>|error result = discoverSkills(sources, testDir);
+    if result is map<SkillInfo> {
+        test:assertFail("Expected error for sibling prefix path");
+    }
+    test:assertTrue(result.message().includes("resolves outside"));
+}
+
+@test:Config
 function testDiscoverSkillsMultipleSources() returns error? {
     string testDir = check file:getAbsolutePath("tests/skills");
     SkillSource[] sources = [

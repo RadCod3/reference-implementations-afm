@@ -52,7 +52,7 @@ function discoverSkills(SkillSource[] sources, string afmFileDir) returns map<Sk
         }
         string resolvedPath = check file:joinPath(afmFileDir, 'source.path);
         string normalizedPath = check file:normalizePath(check file:getAbsolutePath(resolvedPath), file:CLEAN);
-        if !normalizedPath.startsWith(normalizedAfmDir) {
+        if normalizedPath != normalizedAfmDir && !normalizedPath.startsWith(normalizedAfmDir + file:pathSeparator) {
             return error(string `Skill source path '${'source.path}' resolves outside the AFM file directory`);
         }
         map<SkillInfo> localSkills = check discoverLocalSkills(resolvedPath);
