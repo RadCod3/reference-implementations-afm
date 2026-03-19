@@ -44,17 +44,11 @@ type SkillFrontmatter record {
 
 function discoverSkills(SkillSource[] sources, string afmFileDir) returns map<SkillInfo>|error {
     map<SkillInfo> skills = {};
-    string normalizedAfmDir = check file:normalizePath(check file:getAbsolutePath(afmFileDir), file:CLEAN);
 
     foreach SkillSource 'source in sources {
-        if check file:isAbsolutePath('source.path) {
-            return error(string `Skill source path must be relative, but got: ${'source.path}`);
-        }
-        string resolvedPath = check file:joinPath(afmFileDir, 'source.path);
-        string normalizedPath = check file:normalizePath(check file:getAbsolutePath(resolvedPath), file:CLEAN);
-        if normalizedPath != normalizedAfmDir && !normalizedPath.startsWith(normalizedAfmDir + file:pathSeparator) {
-            return error(string `Skill source path '${'source.path}' resolves outside the AFM file directory`);
-        }
+        string resolvedPath = check file:isAbsolutePath('source.path)
+            ? 'source.path
+            : check file:joinPath(afmFileDir, 'source.path);
         map<SkillInfo> localSkills = check discoverLocalSkills(resolvedPath);
         foreach [string, SkillInfo] [name, info] in localSkills.entries() {
             if skills.hasKey(name) {
