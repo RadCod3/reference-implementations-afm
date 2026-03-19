@@ -202,29 +202,12 @@ class TestDiscoverSkills:
         skills = discover_skills([], FIXTURES_DIR)
         assert skills == {}
 
-    def test_absolute_path_raises(self) -> None:
-        sources = [LocalSkillSource(path="/absolute/path/to/skills")]
-        with pytest.raises(ValueError, match="must be relative"):
-            discover_skills(sources, FIXTURES_DIR)
-
-    def test_path_outside_afm_dir_raises(self) -> None:
-        sources = [LocalSkillSource(path="../../outside")]
-        with pytest.raises(ValueError, match="resolves outside"):
-            discover_skills(sources, FIXTURES_DIR)
-
-    def test_sibling_prefix_path_raises(self, tmp_path: Path) -> None:
-        """A sibling directory sharing a name prefix must not pass validation.
-
-        E.g. if afm_dir is '/a/skills', a path resolving to '/a/skills-evil'
-        should be rejected even though it starts with the same string prefix.
-        """
-        afm_dir = tmp_path / "project"
-        sibling = tmp_path / "project-evil"
-        afm_dir.mkdir()
-        sibling.mkdir()
-        sources = [LocalSkillSource(path="../project-evil")]
-        with pytest.raises(ValueError, match="resolves outside"):
-            discover_skills(sources, afm_dir)
+    def test_absolute_path_accepted(self) -> None:
+        abs_path = str((FIXTURES_DIR / "single_skill").resolve())
+        sources = [LocalSkillSource(path=abs_path)]
+        skills = discover_skills(sources, Path("/some/other/dir"))
+        assert len(skills) == 1
+        assert "test-gen" in skills
 
 
 # ---------------------------------------------------------------------------
