@@ -250,4 +250,9 @@ def read_skill_resource(
     if not full_path.is_relative_to(info.base_path.resolve()):
         raise ValueError("Path traversal is not allowed in resource paths")
 
-    return full_path.read_text(encoding="utf-8")
+    try:
+        return full_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raise ValueError(
+            f"Resource '{resource_path}' is a binary file and cannot be read as text"
+        )

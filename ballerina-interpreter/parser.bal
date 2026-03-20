@@ -22,7 +22,8 @@ function parseAfm(string content) returns AFMRecord|error {
 
     AgentMetadata? metadata = ();
     string body;
-    if resolvedContent.startsWith(FRONTMATTER_DELIMITER) {
+    string[] resolvedLines = splitLines(resolvedContent);
+    if resolvedLines.length() > 0 && resolvedLines[0].trim() == FRONTMATTER_DELIMITER {
         map<json> frontmatterMap;
         [frontmatterMap, body] = check extractFrontMatter(resolvedContent);
         metadata = check frontmatterMap.fromJsonWithType();

@@ -213,7 +213,7 @@ class SkillInfo(BaseModel):
     name: str
     description: str
     body: str
-    base_path: Path
+    base_path: Path = Field(exclude=True)
     resources: list[str] = Field(default_factory=list)
 
 
@@ -242,7 +242,7 @@ class AFMRecord(BaseModel):
     metadata: AgentMetadata
     role: str
     instructions: str
-    source_dir: Path | None = None
+    source_dir: Path | None = Field(default=None, exclude=True)
 
 
 class LiteralSegment(BaseModel):

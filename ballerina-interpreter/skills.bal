@@ -73,7 +73,10 @@ function discoverLocalSkills(string path) returns map<SkillInfo>|error {
 
     map<SkillInfo> skills = {};
     file:MetaData[] entries = check file:readDir(absPath);
-    foreach file:MetaData entry in entries {
+    file:MetaData[] sortedEntries = from file:MetaData entry in entries
+        order by entry.absPath ascending
+        select entry;
+    foreach file:MetaData entry in sortedEntries {
         if !entry.dir {
             continue;
         }
@@ -235,7 +238,12 @@ ${resourcesSection}
         }
 
         string fullPath = check file:joinPath(info.basePath, resourcePath);
-        return io:fileReadString(fullPath);
+        string canonicalPath = check file:getAbsolutePath(fullPath);
+        string canonicalBase = check file:getAbsolutePath(info.basePath);
+        if !canonicalPath.startsWith(canonicalBase) {
+            return error("Path traversal is not allowed in resource paths");
+        }
+        return io:fileReadString(canonicalPath);
     }
 
     public isolated function getTools() returns ai:ToolConfig[] =>

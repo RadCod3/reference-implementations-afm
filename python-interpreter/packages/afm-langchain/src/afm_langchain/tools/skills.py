@@ -72,5 +72,5 @@ class ReadSkillResourceTool(BaseTool):
     def _run(self, skill_name: str, resource_path: str, **kwargs: Any) -> str:
         try:
             return read_skill_resource(skill_name, resource_path, self.skills)
-        except ValueError as e:
+        except (ValueError, UnicodeDecodeError) as e:
             return f"Error: {e}"
