@@ -19,11 +19,16 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from langchain_core.callbacks import AsyncCallbackManagerForLLMRun
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langchain_core.messages import BaseMessage
+from langchain_core.outputs import ChatResult
 
 from fastapi import FastAPI
 
@@ -169,3 +174,57 @@ class TestWebhookIntegration:
 
         # Let all background tasks complete
         await asyncio.sleep(0.2)
+
+    @pytest.mark.asyncio
+    async def test_webhook_acknowledges_before_agent_completes(
+        self,
+        sample_webhook_afm: Path,
+    ) -> None:
+        """Verify the webhook returns 202 before the agent finishes running.
+
+        Uses a mock LLM with an artificial delay to prove the response is
+        not blocked on agent execution
+        """
+        agent_delay = 5.0  # seconds the mock LLM will sleep
+        call_count = 0
+
+        class SlowFakeLLM(FakeListChatModel):
+            async def _agenerate(
+                self,
+                messages: list[BaseMessage],
+                stop: list[str] | None = None,
+                run_manager: AsyncCallbackManagerForLLMRun | None = None,
+                **kwargs: Any,
+            ) -> ChatResult:
+                nonlocal call_count
+                call_count += 1
+                await asyncio.sleep(agent_delay)
+                return await super()._agenerate(
+                    messages, stop=stop, run_manager=run_manager, **kwargs
+                )
+
+        slow_llm = SlowFakeLLM(responses=["Slowly processed."])
+        afm = parse_afm_file(sample_webhook_afm, resolve_env=False)
+        runner = LangChainRunner(afm, model=slow_llm)
+        app = create_webhook_app(runner, auto_subscribe=False, verify_signatures=False)
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            before = time.monotonic()
+            response = await client.post(
+                "/webhook",
+                json={"event": "slow_test", "order_id": "1"},
+                headers={"User-Agent": "TestClient/1.0"},
+            )
+            elapsed = time.monotonic() - before
+
+        assert response.status_code == 202
+        # The response must arrive well before the agent delay completes
+        assert elapsed < 2.0, (
+            f"Webhook responded in {elapsed:.2f}s; expected fast ack (<2s) "
+            f"while agent runs for ~{agent_delay}s in the background"
+        )
+
+        # Wait for the background agent to finish and verify it actually ran
+        await asyncio.sleep(agent_delay + 0.5)
+        assert call_count == 1, "Slow mock LLM should have been invoked exactly once"
