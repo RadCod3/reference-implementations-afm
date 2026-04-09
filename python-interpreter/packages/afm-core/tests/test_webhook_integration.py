@@ -107,11 +107,13 @@ class TestWebhookIntegration:
         """Verify the prompt template is evaluated with the webhook payload before being sent to the LLM."""
         # Track what the LLM receives by wrapping arun on the runner
         received_prompts: list[str] = []
+        prompt_received = asyncio.Event()
         original_agenerate = fake_llm._agenerate
 
         async def tracking_agenerate(messages, stop=None, run_manager=None, **kwargs):
             # The last message is the HumanMessage with the evaluated prompt
             received_prompts.append(messages[-1].content)
+            prompt_received.set()
             return await original_agenerate(
                 messages, stop=stop, run_manager=run_manager, **kwargs
             )
@@ -128,8 +130,8 @@ class TestWebhookIntegration:
 
         assert response.status_code == 202
 
-        # Let the background task complete
-        await asyncio.sleep(0.1)
+        # Wait for the background agent task to invoke the LLM
+        await asyncio.wait_for(prompt_received.wait(), timeout=5.0)
 
         assert len(received_prompts) == 1
         # The AFM template is: "[${http:payload.event}] Process the following order event: ${http:payload}"
@@ -151,7 +153,26 @@ class TestWebhookIntegration:
         sample_webhook_afm: Path,
     ) -> None:
         """Each webhook invocation should trigger an independent agent run."""
-        fake_llm = FakeListChatModel(
+        call_count = 0
+        all_calls_seen = asyncio.Event()
+
+        class CountingFakeLLM(FakeListChatModel):
+            async def _agenerate(
+                self,
+                messages: list[BaseMessage],
+                stop: list[str] | None = None,
+                run_manager: AsyncCallbackManagerForLLMRun | None = None,
+                **kwargs: Any,
+            ) -> ChatResult:
+                nonlocal call_count
+                call_count += 1
+                if call_count == 3:
+                    all_calls_seen.set()
+                return await super()._agenerate(
+                    messages, stop=stop, run_manager=run_manager, **kwargs
+                )
+
+        fake_llm = CountingFakeLLM(
             responses=[
                 "Processed event 1",
                 "Processed event 2",
@@ -172,8 +193,9 @@ class TestWebhookIntegration:
                 )
                 assert response.status_code == 202
 
-        # Let all background tasks complete
-        await asyncio.sleep(0.2)
+        # Wait for all three background agent tasks to complete
+        await asyncio.wait_for(all_calls_seen.wait(), timeout=5.0)
+        assert call_count == 3
 
     @pytest.mark.asyncio
     async def test_webhook_acknowledges_before_agent_completes(
