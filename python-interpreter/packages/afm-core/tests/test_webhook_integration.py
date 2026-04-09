@@ -107,7 +107,9 @@ class TestWebhookIntegration:
         async def tracking_agenerate(messages, stop=None, run_manager=None, **kwargs):
             # The last message is the HumanMessage with the evaluated prompt
             received_prompts.append(messages[-1].content)
-            return await original_agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+            return await original_agenerate(
+                messages, stop=stop, run_manager=run_manager, **kwargs
+            )
 
         fake_llm._agenerate = tracking_agenerate  # type: ignore[assignment]
 
