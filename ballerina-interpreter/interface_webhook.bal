@@ -55,11 +55,7 @@ function attachWebhookService(websub:Listener websubListener, ai:Agent agent, We
         isolated service object {
             remote function onEventNotification(readonly & websub:ContentDistributionMessage msg)
                     returns websub:Acknowledgement|error {
-                json payload = msg.content.toJson();
-
-                json result = check getResult(compiledPrompt, payload, msg, agent);
-
-                log:printInfo("Webhook payload handled: " + result.toJsonString());
+                _ = start runAgentOnWebSubEventNotification(compiledPrompt, msg, agent);
                 return websub:ACKNOWLEDGEMENT;
             }
         };
@@ -67,14 +63,24 @@ function attachWebhookService(websub:Listener websubListener, ai:Agent agent, We
     return websubListener.attach(webhookService, httpExposure.path);
 }
 
-function getResult(readonly & CompiledTemplate? compiledPrompt,
-                   json payload,
+function runAgentOnWebSubEventNotification(readonly & CompiledTemplate? compiledPrompt,
                    readonly & websub:ContentDistributionMessage msg,
-                   ai:Agent agent) returns json|error {
-    json agentInput = compiledPrompt is CompiledTemplate ?
-        check evaluateTemplate(compiledPrompt, payload, msg.headers) :
+                   ai:Agent agent) {
+    json payload = msg.content.toJson();
+    json|error agentInput = compiledPrompt is CompiledTemplate ?
+        evaluateTemplate(compiledPrompt, payload, msg.headers) :
         payload;
-    return runAgent(agent, agentInput);
+    if agentInput is error {
+        log:printError("Error evaluating prompt template", agentInput);
+        return;
+    }
+
+    json|error result = runAgent(agent, agentInput);
+    if result is error {
+        log:printError("Error processing webhook payload", result);
+        return;
+    }
+    log:printDebug("Webhook event handled successfully");
 }
 
 function compileTemplate(string template) returns CompiledTemplate|error {

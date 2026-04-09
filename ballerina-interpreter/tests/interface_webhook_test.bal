@@ -14,11 +14,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import ballerina/file;
 import ballerina/http;
+import ballerina/io;
 import ballerina/lang.runtime;
 import ballerina/log;
 import ballerina/os;
 import ballerina/test;
+import ballerina/time;
 import ballerina/websubhub;
 
 // In-memory store for subscriptions
@@ -254,4 +257,114 @@ function testWebhookEndToEnd() returns error? {
 
     error? stopResult = hubListener.gracefulStop();
     test:assertTrue(stopResult is (), "Hub listener should stop gracefully");
+    check os:unsetEnv("WH_HOST");
+}
+
+// Delay used by the slow mock LLM to simulate a long-running agent invocation.
+const decimal SLOW_MOCK_LLM_DELAY = 5;
+
+// Polls the hub's subscription map until the expected subscription appears,
+// to avoid timing-sensitive fixed sleeps while waiting for an AFM agent to
+// complete its WebSub subscription.
+function waitForSubscription(string topicUrl, decimal timeoutSeconds = 15) returns error? {
+    decimal deadline = time:monotonicNow() + timeoutSeconds;
+    while time:monotonicNow() < deadline {
+        if subscriptions.hasKey(topicUrl) {
+            return;
+        }
+        runtime:sleep(0.1);
+    }
+    return error(string `Timed out after ${timeoutSeconds}s waiting for subscription to ${topicUrl}`);
+}
+
+// Number of times the slow mock LLM endpoint has been invoked. Used by the
+// test to assert that the background agent execution actually reached the LLM.
+isolated int slowMockCallCount = 0;
+
+// Mock HTTP service for LLM that sleeps before responding, used to verify
+// that the webhook subscriber acknowledges before the agent completes.
+service /slow\-llm/v1\.0 on new http:Listener(29194) {
+
+    resource function post webhook/chat/completions(@http:Payload json _payload) returns json {
+        lock {
+            slowMockCallCount += 1;
+        }
+        runtime:sleep(SLOW_MOCK_LLM_DELAY);
+        return {
+            "id": "chatcmpl-slow-mock",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Slowly processed."
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "total_tokens": 30
+            }
+        };
+    }
+}
+
+// Verifies that the WebSub subscriber returns an acknowledgement before the
+// agent execution completes, as required by the WebSub spec.
+// Uses a slow mock LLM so the agent run takes ~SLOW_MOCK_LLM_DELAY seconds;
+// the publisher should receive a success response well before that delay elapses.
+@test:Config
+function testWebhookAcknowledgesBeforeAgentCompletes() returns error? {
+    lock {
+        slowMockCallCount = 0;
+    }
+    check os:setEnv("WH_SLOW_HOST", "http://localhost:28086");
+
+    // Start an independent WebSub hub on a dedicated port to avoid
+    // interfering with the other webhook test's hub.
+    websubhub:Listener hubListener = check new (29195);
+    check hubListener.attach(hubService, "/websub/hub");
+    check hubListener.'start();
+
+    // Call runAgentFromAFM directly so the port doesn't collide with the other
+    // test's main() which uses the module-level configurable port (8085).
+    string afmPath = "tests/sample_webhook_agent_slow.afm.md";
+    string afmContent = check io:fileReadString(afmPath);
+    AFMRecord afm = check parseAfm(afmContent);
+    string afmFileDir = check file:parentPath(check file:getAbsolutePath(afmPath));
+    future<error?> _ = start runAgentFromAFM(afm, 28086, afmFileDir);
+
+    string topicUrl = "http://localhost:29195/events/slow-orders";
+    check waitForSubscription(topicUrl);
+
+    websubhub:PublisherClient publisher = check new ("http://localhost:29195/websub/hub");
+
+    decimal before = time:monotonicNow();
+    _ = check publisher->publishUpdate(topicUrl, <map<json>> {event: "slow.test", orderId: "1"});
+    decimal elapsed = time:monotonicNow() - before;
+
+    // The subscriber must acknowledge the content distribution request before
+    // the agent completes. The slow mock LLM sleeps for SLOW_MOCK_LLM_DELAY
+    // seconds, so if acknowledgement is synchronous the publish call will take
+    // at least that long.
+    test:assertTrue(elapsed < 2d,
+        string `publishUpdate returned in ${elapsed}s; expected fast ack ` +
+        string `(< 2s) while agent runs for ~${SLOW_MOCK_LLM_DELAY}s in the background`);
+
+    // Allow the background agent run to complete before the hub listener shuts
+    // down so we don't leave dangling HTTP work.
+    runtime:sleep(SLOW_MOCK_LLM_DELAY + 1d);
+
+    lock {
+        test:assertEquals(slowMockCallCount, 1,
+            "Slow mock LLM should have been invoked exactly once by the background agent run");
+    }
+    error? stopResult = hubListener.gracefulStop();
+    test:assertTrue(stopResult is (), "Hub listener should stop gracefully");
+    check os:unsetEnv("WH_SLOW_HOST");
 }
