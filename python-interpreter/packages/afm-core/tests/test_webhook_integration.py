@@ -148,7 +148,7 @@ class TestWebhookIntegration:
         assert response.json()["status"] == "ok"
 
     @pytest.mark.asyncio
-    async def test_webhook_multiple_payloads(
+    async def test_webhook_multiple_requests(
         self,
         sample_webhook_afm: Path,
     ) -> None:
