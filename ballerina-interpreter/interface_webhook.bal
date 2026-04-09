@@ -53,7 +53,7 @@ function attachWebhookService(websub:Listener websubListener, ai:Agent agent, We
             callback: subscription.callback
         }
         isolated service object {
-            remote function onEventNotification(readonly & websub:ContentDistributionMessage msg)
+            isolated remote function onEventNotification(readonly & websub:ContentDistributionMessage msg)
                     returns websub:Acknowledgement|error {
                 _ = start runAgentOnWebSubEventNotification(compiledPrompt, msg, agent);
                 return websub:ACKNOWLEDGEMENT;
@@ -63,7 +63,7 @@ function attachWebhookService(websub:Listener websubListener, ai:Agent agent, We
     return websubListener.attach(webhookService, httpExposure.path);
 }
 
-function runAgentOnWebSubEventNotification(readonly & CompiledTemplate? compiledPrompt,
+isolated function runAgentOnWebSubEventNotification(readonly & CompiledTemplate? compiledPrompt,
                    readonly & websub:ContentDistributionMessage msg,
                    ai:Agent agent) {
     json payload = msg.content.toJson();
@@ -152,7 +152,8 @@ function compileTemplate(string template) returns CompiledTemplate|error {
     return {segments: segments.cloneReadOnly()};
 }
 
-function evaluateTemplate(CompiledTemplate compiled, json payload, map<string|string[]>? headers) returns string|error {
+isolated function evaluateTemplate(
+        CompiledTemplate compiled, json payload, map<string|string[]>? headers) returns string|error {
     string[] parts = [];
 
     foreach TemplateSegment segment in compiled.segments {
@@ -197,7 +198,7 @@ function evaluateTemplate(CompiledTemplate compiled, json payload, map<string|st
     return string:'join("", ...parts);
 }
 
-function handlePayloadVariable(json payload, string[] parts, PayloadVariable segment) {
+isolated function handlePayloadVariable(json payload, string[] parts, PayloadVariable segment) {
     if segment.path == "" {
         // ${http:payload} - return entire payload
         parts.push(payload.toJsonString());
@@ -218,7 +219,7 @@ function handlePayloadVariable(json payload, string[] parts, PayloadVariable seg
 
 // Access a JSON field using dot notation or bracket notation
 // Supports: field.nested, field['key'], field[0], etc.
-function accessJsonField(json payload, string path) returns json|error {
+isolated function accessJsonField(json payload, string path) returns json|error {
     // Handle bracket notation like ['field.with.dots'] or [0]
     if path.startsWith("[") {
         return handleBracketNotation(payload, path);
@@ -228,7 +229,7 @@ function accessJsonField(json payload, string path) returns json|error {
     return handleDotNotation(payload, path);
 }
 
-function handleBracketNotation(json payload, string path) returns json|error {
+isolated function handleBracketNotation(json payload, string path) returns json|error {
     int? closeBracket = path.indexOf("]");
     if closeBracket is () {
         return error(string `Invalid bracket notation in path: ${path}`);
@@ -261,7 +262,7 @@ function handleBracketNotation(json payload, string path) returns json|error {
     return accessJsonField(nextValue, remainingPath);
 }
 
-function handleQuotedKey(json payload, string bracketContent) returns json|error {
+isolated function handleQuotedKey(json payload, string bracketContent) returns json|error {
     string key = bracketContent.substring(1, bracketContent.length() - 1);
 
     if !(payload is map<json>) {
@@ -276,7 +277,7 @@ function handleQuotedKey(json payload, string bracketContent) returns json|error
     return value;
 }
 
-function handleArrayIndex(json payload, string bracketContent) returns json|error {
+isolated function handleArrayIndex(json payload, string bracketContent) returns json|error {
     int|error index = int:fromString(bracketContent);
     if index is error {
         return error(string `Invalid array index: ${bracketContent}`);
@@ -293,7 +294,7 @@ function handleArrayIndex(json payload, string bracketContent) returns json|erro
     return payload[index];
 }
 
-function handleDotNotation(json payload, string path) returns json|error {
+isolated function handleDotNotation(json payload, string path) returns json|error {
     string[] parts = regexp:split(re `\.`, path);
     json current = payload;
 
@@ -324,7 +325,7 @@ function handleDotNotation(json payload, string path) returns json|error {
     return current;
 }
 
-function handleMixedNotation(json current, string part) returns json|error {
+isolated function handleMixedNotation(json current, string part) returns json|error {
     int? bracketPos = part.indexOf("[");
     if bracketPos is () {
         return error(string `Invalid mixed notation in part: ${part}`);

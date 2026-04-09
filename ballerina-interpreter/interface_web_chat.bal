@@ -31,20 +31,20 @@ function attachChatService(http:Listener httpListener, ai:Agent agent,
     return httpListener.attach(httpService, httpExposure.path);
 }
 
-service class ChatHttpService {
+isolated service class ChatHttpService {
     *http:Service;
 
     private final readonly & map<json> inputSchema;
     private final readonly & map<json> outputSchema;
     private final ai:Agent agent;
 
-    function init(ai:Agent agent, WebChatInterface webChatInterface) returns error? {
+    isolated function init(ai:Agent agent, WebChatInterface webChatInterface) returns error? {
         self.inputSchema = webChatInterface.signature.input.cloneReadOnly();
         self.outputSchema = webChatInterface.signature.output.cloneReadOnly();
         self.agent = agent;
     }
 
-    resource function post .(@http:Payload json payload) returns json|http:BadRequest|http:InternalServerError {
+    isolated resource function post .(@http:Payload json payload) returns json|http:BadRequest|http:InternalServerError {
         json|InputError|AgentError runAgentResult = runAgent(self.agent, payload, self.inputSchema, self.outputSchema);
         if runAgentResult is json {
             return runAgentResult;
@@ -57,16 +57,16 @@ service class ChatHttpService {
     }
 }
 
-service class StringChatHttpService {
+isolated service class StringChatHttpService {
     *http:Service;
 
     private final ai:Agent agent;
 
-    function init(ai:Agent agent) returns error? {
+    isolated function init(ai:Agent agent) returns error? {
         self.agent = agent;
     }
 
-    resource function post .(@http:Payload string payload, 
+    isolated resource function post .(@http:Payload string payload, 
                              @http:Header {name: "X-Session-Id"} string sessionId = DEFAULT_SESSION_ID) 
                                 returns string|http:InternalServerError {
         string|error runAgentResult = runAgent(self.agent, payload, sessionId = sessionId).ensureType();
