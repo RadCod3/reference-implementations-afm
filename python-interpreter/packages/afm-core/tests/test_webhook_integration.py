@@ -1,0 +1,169 @@
+# Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+#
+# WSO2 LLC. licenses this file to you under the Apache License,
+# Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+"""Integration tests for the webhook interface using a real agent runner with a mock LLM."""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+from langchain_core.language_models.fake_chat_models import FakeListChatModel
+
+from fastapi import FastAPI
+
+from afm.interfaces.webhook import create_webhook_app
+from afm.parser import parse_afm_file
+from afm_langchain.backend import LangChainRunner
+
+
+@pytest.fixture
+def sample_webhook_afm() -> Path:
+    return Path(__file__).parent / "fixtures" / "sample_webhook_agent.afm.md"
+
+
+@pytest.fixture
+def fake_llm() -> FakeListChatModel:
+    return FakeListChatModel(
+        responses=["Order processed successfully. Order ID: 12345 confirmed."]
+    )
+
+
+@pytest.fixture
+def webhook_runner(
+    sample_webhook_afm: Path, fake_llm: FakeListChatModel
+) -> LangChainRunner:
+    afm = parse_afm_file(sample_webhook_afm, resolve_env=False)
+    return LangChainRunner(afm, model=fake_llm)
+
+
+@pytest.fixture
+def webhook_app(webhook_runner: LangChainRunner) -> FastAPI:
+    return create_webhook_app(
+        webhook_runner,
+        auto_subscribe=False,
+        verify_signatures=False,
+    )
+
+
+class TestWebhookIntegration:
+    @pytest.mark.asyncio
+    async def test_webhook_accepts_and_runs_agent(
+        self, webhook_app, webhook_runner: LangChainRunner
+    ) -> None:
+        transport = ASGITransport(app=webhook_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/webhook",
+                json={"event": "order_created", "order_id": "12345"},
+                headers={"User-Agent": "TestClient/1.0"},
+            )
+
+        assert response.status_code == 202
+        assert response.json() == {"status": "accepted"}
+
+        # Let the background task complete
+        await asyncio.sleep(0.1)
+
+    @pytest.mark.asyncio
+    async def test_webhook_rejects_invalid_json(self, webhook_app) -> None:
+        transport = ASGITransport(app=webhook_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/webhook",
+                content=b"not json",
+                headers={"Content-Type": "application/json"},
+            )
+
+        assert response.status_code == 400
+        assert "Invalid JSON" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_webhook_template_evaluation(
+        self,
+        webhook_app,
+        fake_llm: FakeListChatModel,
+    ) -> None:
+        """Verify the prompt template is evaluated with the webhook payload before being sent to the LLM."""
+        # Track what the LLM receives by wrapping arun on the runner
+        received_prompts: list[str] = []
+        original_agenerate = fake_llm._agenerate
+
+        async def tracking_agenerate(messages, stop=None, run_manager=None, **kwargs):
+            # The last message is the HumanMessage with the evaluated prompt
+            received_prompts.append(messages[-1].content)
+            return await original_agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+        fake_llm._agenerate = tracking_agenerate  # type: ignore[assignment]
+
+        transport = ASGITransport(app=webhook_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/webhook",
+                json={"event": "order_placed", "order_id": "99"},
+                headers={"User-Agent": "WebhookTest/2.0"},
+            )
+
+        assert response.status_code == 202
+
+        # Let the background task complete
+        await asyncio.sleep(0.1)
+
+        assert len(received_prompts) == 1
+        # The AFM template is: "[${http:payload.event}] Process the following order event: ${http:payload}"
+        assert "[order_placed]" in received_prompts[0]
+        assert "order_id" in received_prompts[0]
+
+    @pytest.mark.asyncio
+    async def test_health_endpoint(self, webhook_app) -> None:
+        transport = ASGITransport(app=webhook_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/health")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_webhook_multiple_payloads(
+        self,
+        sample_webhook_afm: Path,
+    ) -> None:
+        """Each webhook invocation should trigger an independent agent run."""
+        fake_llm = FakeListChatModel(
+            responses=[
+                "Processed event 1",
+                "Processed event 2",
+                "Processed event 3",
+            ]
+        )
+        afm = parse_afm_file(sample_webhook_afm, resolve_env=False)
+        runner = LangChainRunner(afm, model=fake_llm)
+        app = create_webhook_app(runner, auto_subscribe=False, verify_signatures=False)
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            for i in range(3):
+                response = await client.post(
+                    "/webhook",
+                    json={"event": f"event_{i}", "seq": i},
+                    headers={"User-Agent": "TestClient/1.0"},
+                )
+                assert response.status_code == 202
+
+        # Let all background tasks complete
+        await asyncio.sleep(0.2)
