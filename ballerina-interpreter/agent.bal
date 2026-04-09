@@ -133,7 +133,7 @@ function getModel(Model? model) returns ai:ModelProvider|error {
 
 const DEFAULT_SESSION_ID = "sessionId";
 
-function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), 
+isolated function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (), 
                   map<json>? outputSchema = (), string sessionId = DEFAULT_SESSION_ID) 
         returns json|InputError|AgentError {
     error? validateJsonSchemaResult = validateJsonSchema(inputSchema, payload);
@@ -209,7 +209,7 @@ function runAgent(ai:Agent agent, json payload, map<json>? inputSchema = (),
     return responseJsonObject.get("value");
 }
 
-function extractJsonFromCodeBlock(string response) returns string {
+isolated function extractJsonFromCodeBlock(string response) returns string {
     // Prioritize ```json block, fall back to generic ```
     int? jsonBlockStart = response.indexOf("```json");
     int? contentStart = jsonBlockStart is int ? jsonBlockStart + 7 : ();
