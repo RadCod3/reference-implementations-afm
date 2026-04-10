@@ -1,9 +1,6 @@
 # Stage 1: Builder
 FROM python:3.13-alpine AS builder
 
-# Patch CVE-2026-28390
-RUN apk upgrade --no-cache libcrypto3 libssl3
-
 # Install uv for fast dependency management
 COPY --from=ghcr.io/astral-sh/uv:0.10.0 /uv /uvx /bin/
 
@@ -35,7 +32,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # VARIANT=slim ships only Python + .venv.
 FROM python:3.13-alpine
 
-# Patch CVE-2026-28390
+# Upgrade OpenSSL libs to pick up security fixes not yet in the base image
 RUN apk upgrade --no-cache libcrypto3 libssl3
 ARG VARIANT=full
 
