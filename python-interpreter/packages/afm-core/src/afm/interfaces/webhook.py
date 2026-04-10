@@ -22,7 +22,7 @@ import hmac
 import json
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator
 
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
@@ -39,10 +39,6 @@ if TYPE_CHECKING:
     from ..models import CompiledTemplate, WebhookInterface
 
 logger = logging.getLogger(__name__)
-
-
-class WebhookResponse(BaseModel):
-    result: Any = Field(..., description="The agent's response to the webhook")
 
 
 class ErrorResponse(BaseModel):
@@ -218,10 +214,6 @@ def create_webhook_router(
     if interface.prompt:
         compiled_prompt = compile_template(interface.prompt)
 
-    # Get signature configuration
-    signature = interface.signature
-    output_is_string = signature.output.type == "string"
-
     # Get subscription configuration
     subscription = interface.subscription
     secret = subscription.secret
@@ -260,13 +252,20 @@ def create_webhook_router(
             return PlainTextResponse(content=hub_challenge)
         raise HTTPException(status_code=404, detail="Invalid mode")
 
+    async def _run_agent_in_background(user_prompt: str) -> None:
+        try:
+            response = await agent.arun(user_prompt)
+            logger.debug(f"Agent response: {response}")
+        except Exception:
+            logger.exception("Agent execution error")
+
     # Webhook receiver endpoint
     @router.post(
         path,
+        status_code=202,
         responses={
             400: {"model": ErrorResponse},
             401: {"model": ErrorResponse},
-            500: {"model": ErrorResponse},
         },
     )
     async def receive_webhook(request: Request) -> JSONResponse:
@@ -309,33 +308,10 @@ def create_webhook_router(
             # Default: stringify the payload
             user_prompt = json.dumps(payload, indent=2)
 
-        try:
-            # Run the agent
-            response = await agent.arun(user_prompt)
-            logger.debug(f"Agent response: {response}")
+        task = asyncio.create_task(_run_agent_in_background(user_prompt))
+        task.add_done_callback(log_task_exception)
 
-            # Format response based on output schema
-            if output_is_string:
-                if not isinstance(response, str):
-                    response = json.dumps(response)
-                return JSONResponse(content={"result": response})
-            else:
-                if isinstance(response, dict):
-                    return JSONResponse(content=response)
-                elif isinstance(response, str):
-                    try:
-                        return JSONResponse(content=json.loads(response))
-                    except json.JSONDecodeError:
-                        return JSONResponse(content={"result": response})
-                else:
-                    return JSONResponse(content={"result": response})
-
-        except Exception as e:
-            logger.exception("Agent execution error")
-            raise HTTPException(
-                status_code=500,
-                detail="Internal server error",
-            ) from e
+        return JSONResponse(status_code=202, content={"status": "accepted"})
 
     return router
 

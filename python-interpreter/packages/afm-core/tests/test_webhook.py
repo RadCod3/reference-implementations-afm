@@ -219,7 +219,7 @@ class TestCreateWebhookApp:
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
 
-    def test_webhook_processes_payload(self, mock_webhook_agent: MagicMock) -> None:
+    def test_webhook_accepts_payload(self, mock_webhook_agent: MagicMock) -> None:
         app = create_webhook_app(
             mock_webhook_agent,
             auto_subscribe=False,
@@ -233,11 +233,9 @@ class TestCreateWebhookApp:
             headers={"User-Agent": "TestClient/1.0"},
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = response.json()
-        assert "result" in data
-        # The template should have substituted the values
-        assert "Processed:" in data["result"]
+        assert data["status"] == "accepted"
 
     def test_webhook_with_signature_verification(
         self, mock_webhook_agent: MagicMock
@@ -264,7 +262,7 @@ class TestCreateWebhookApp:
             },
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 202
 
     def test_webhook_rejects_invalid_signature(
         self, mock_webhook_agent: MagicMock
@@ -300,9 +298,9 @@ class TestCreateWebhookApp:
             json={"type": "notification", "message": "Hello"},
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = response.json()
-        assert "Raw payload:" in data["result"]
+        assert data["status"] == "accepted"
 
     def test_webhook_invalid_json_returns_400(
         self, mock_webhook_agent: MagicMock
@@ -323,7 +321,7 @@ class TestCreateWebhookApp:
         assert response.status_code == 400
         assert "Invalid JSON" in response.json()["detail"]
 
-    def test_webhook_agent_error_returns_500(
+    def test_webhook_agent_error_still_returns_202(
         self, mock_webhook_agent: MagicMock
     ) -> None:
 
@@ -344,8 +342,9 @@ class TestCreateWebhookApp:
             json={"event": "test"},
         )
 
-        assert response.status_code == 500
-        assert "Internal server error" in response.json()["detail"]
+        # Fire-and-forget: always returns 202, agent errors are logged in background
+        assert response.status_code == 202
+        assert response.json()["status"] == "accepted"
 
 
 class TestWebSubVerification:
