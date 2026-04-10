@@ -1,6 +1,9 @@
 # Stage 1: Builder
 FROM python:3.13-alpine AS builder
 
+# Patch CVE-2026-28390: NULL pointer dereference in OpenSSL CMS processing (DoS)
+RUN apk upgrade --no-cache openssl
+
 # Install uv for fast dependency management
 COPY --from=ghcr.io/astral-sh/uv:0.10.0 /uv /uvx /bin/
 
@@ -31,6 +34,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # VARIANT=full installs Node.js, npm (npx), git, and uv/uvx for MCP server support.
 # VARIANT=slim ships only Python + .venv.
 FROM python:3.13-alpine
+
+# Patch CVE-2026-28390: NULL pointer dereference in OpenSSL CMS processing (DoS)
+RUN apk upgrade --no-cache openssl
 ARG VARIANT=full
 
 # Validate VARIANT early so typos fail loudly instead of silently producing a slim build.
